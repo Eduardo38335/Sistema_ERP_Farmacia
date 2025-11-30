@@ -1,0 +1,344 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<style>
+    /* Estilo para item activo con teclado */
+    .item-resultado.active {
+        background-color: #0d6efd;
+        color: white;
+    }
+    
+    /* Tabla compacta */
+    .tabla-captura th { background: #343a40; color: white; font-size: 0.85rem; text-align: right; }
+    .tabla-captura td { text-align: right; vertical-align: middle; }
+    .tabla-captura td:first-child, .tabla-captura th:first-child { text-align: left; }
+    
+    /* Inputs limpios */
+    input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; }
+
+    .lista-flotante {
+        position: absolute; z-index: 1000; width: 100%; max-height: 200px;
+        overflow-y: auto; background: white; border: 1px solid #ced4da; display: none;
+    }
+    .item-resultado { padding: 8px 12px; border-bottom: 1px solid #eee; cursor: pointer; }
+    .item-resultado:hover { background-color: #e9ecef; }
+</style>
+
+<div class="card shadow-lg border-0">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="bi bi-receipt"></i> Nueva Factura de Compra</h5>
+    </div>
+    <div class="card-body bg-light">
+        
+        <div class="row mb-3 p-3 bg-white border rounded">
+            <div class="col-md-4 position-relative">
+                <label class="fw-bold small">Proveedor</label>
+                <input type="text" id="busc_prov" class="form-control" placeholder="Buscar..." autocomplete="off">
+                <input type="hidden" id="id_prov">
+                <div id="lista_prov" class="lista-flotante"></div>
+            </div>
+            <div class="col-md-4">
+                <label class="fw-bold small">Folio Factura</label>
+                <input type="text" id="folio" class="form-control">
+            </div>
+            <div class="col-md-4">
+                <label class="fw-bold small">Fecha</label>
+                <input type="date" id="fecha" class="form-control">
+            </div>
+        </div>
+
+        <div class="row g-2 align-items-end mb-2">
+            <div class="col-md-3 position-relative">
+                <label class="small text-muted">Producto</label>
+                <input type="text" id="busc_prod" class="form-control" placeholder="Escanear/Escribir..." autocomplete="off">
+                <input type="hidden" id="id_prod">
+                <div id="lista_prod" class="lista-flotante"></div>
+            </div>
+            <div class="col-md-2">
+                <label class="small text-muted">Lote</label>
+                <input type="text" id="lote" class="form-control">
+            </div>
+            <div class="col-md-2">
+                <label class="small text-muted">Caducidad</label>
+                <input type="date" id="caducidad" class="form-control">
+            </div>
+            <div class="col-md-1">
+                <label class="small text-muted">Cant.</label>
+                <input type="number" id="cant" class="form-control text-center" value="1" onfocus="this.select()">
+            </div>
+            <div class="col-md-2">
+                <label class="small text-muted">Costo Base ($)</label>
+                <input type="number" id="costo" class="form-control text-end" onfocus="this.select()">
+            </div>
+            <div class="col-md-1">
+                <label class="small text-muted">% IVA</label>
+                <input type="number" id="tasa_iva" class="form-control text-center" value="0" onfocus="this.select()">
+            </div>
+            <div class="col-md-1">
+                <button class="btn btn-success w-100" onclick="agregarLinea()"><i class="bi bi-plus-lg"></i></button>
+            </div>
+        </div>
+
+        <div class="table-responsive bg-white border rounded mb-3" style="min-height: 200px;">
+            <table class="table table-hover table-sm tabla-captura mb-0">
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th>Lote</th>
+                        <th>Cant.</th>
+                        <th>Costo U.</th>
+                        <th>Subtotal</th>
+                        <th>IVA</th>
+                        <th>Total</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="tabla-body"></tbody>
+            </table>
+        </div>
+
+        <div class="row justify-content-end mb-3">
+            <div class="col-md-4">
+                <table class="table table-sm table-borderless text-end mb-0">
+                    <tr>
+                        <td>Subtotal:</td>
+                        <td class="fw-bold" id="lbl-subtotal">$0.00</td>
+                    </tr>
+                    <tr>
+                        <td>Impuestos:</td>
+                        <td class="fw-bold text-danger" id="lbl-impuestos">$0.00</td>
+                    </tr>
+                    <tr class="border-top">
+                        <td class="fs-5">Total Factura:</td>
+                        <td class="fs-5 fw-bold text-success" id="lbl-total">$0.00</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2 border-top pt-3">
+            <a href="/compras" class="btn btn-secondary">Cancelar</a>
+            <button class="btn btn-primary px-4 fw-bold" onclick="guardarFactura()">
+                <i class="bi bi-save"></i> GUARDAR FACTURA
+            </button>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // DATOS DE PYTHON
+    const listaProveedores = [{% for p in proveedores %} { id: "{{p[0]}}", texto: "{{p[1]}}" }, {% endfor %}];
+    const listaProductos = [{% for p in productos %} { id: "{{p[0]}}", texto: "{{p[1]}}" }, {% endfor %}];
+
+    // ESTADO DE LA FACTURA
+    let carritoCompra = [];
+    
+    // --- INICIALIZAR BUSCADORES CON TECLADO ---
+    initLiveSearch('busc_prov', 'id_prov', 'lista_prov', listaProveedores);
+    initLiveSearch('busc_prod', 'id_prod', 'lista_prod', listaProductos, true); // true = es producto
+
+    function initLiveSearch(inputId, hiddenId, listId, data, isProduct=false) {
+        const input = document.getElementById(inputId);
+        const hidden = document.getElementById(hiddenId);
+        const list = document.getElementById(listId);
+        let currentFocus = -1;
+
+        input.addEventListener('input', function() {
+            const term = this.value.toLowerCase();
+            list.innerHTML = '';
+            currentFocus = -1;
+            
+            if (term.length < 1) { list.style.display = 'none'; return; }
+
+            const matches = data.filter(item => item.texto.toLowerCase().includes(term));
+            
+            if (matches.length > 0) {
+                list.style.display = 'block';
+                matches.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'item-resultado';
+                    div.innerText = item.texto;
+                    div.addEventListener('click', function() {
+                        selectItem(item);
+                    });
+                    list.appendChild(div);
+                });
+            } else {
+                list.style.display = 'none';
+            }
+        });
+
+        // NAVEGACIÓN CON TECLADO (FLECHAS Y ENTER)
+        input.addEventListener('keydown', function(e) {
+            let items = list.getElementsByTagName('div');
+            if (e.key === 'ArrowDown') {
+                currentFocus++;
+                addActive(items);
+            } else if (e.key === 'ArrowUp') {
+                currentFocus--;
+                addActive(items);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (currentFocus > -1) {
+                    if (items) items[currentFocus].click();
+                } else if (items.length === 1) {
+                    // Si solo hay 1 resultado y das enter, lo selecciona
+                    items[0].click();
+                }
+            }
+        });
+
+        function addActive(x) {
+            if (!x) return false;
+            removeActive(x);
+            if (currentFocus >= x.length) currentFocus = 0;
+            if (currentFocus < 0) currentFocus = (x.length - 1);
+            x[currentFocus].classList.add('active');
+            // Scroll automático para seguir la selección
+            x[currentFocus].scrollIntoView({ block: 'nearest' });
+        }
+
+        function removeActive(x) {
+            for (let i = 0; i < x.length; i++) {
+                x[i].classList.remove('active');
+            }
+        }
+
+        function selectItem(item) {
+            input.value = item.texto;
+            hidden.value = item.id;
+            list.style.display = 'none';
+            
+            // SALTO INTELIGENTE AL SIGUIENTE CAMPO
+            if (isProduct) {
+                document.getElementById('lote').focus();
+            } else {
+                document.getElementById('folio').focus();
+            }
+        }
+        
+        // Cerrar al hacer clic fuera
+        document.addEventListener('click', function (e) {
+            if (e.target !== input) list.style.display = 'none';
+        });
+    }
+
+    // --- AGREGAR LINEA (CON CÁLCULOS FISCALES) ---
+    function agregarLinea() {
+        const idProd = document.getElementById('id_prod').value;
+        const nombreProd = document.getElementById('busc_prod').value;
+        const lote = document.getElementById('lote').value;
+        const caducidad = document.getElementById('caducidad').value;
+        
+        const cant = parseFloat(document.getElementById('cant').value) || 0;
+        const costoBase = parseFloat(document.getElementById('costo').value) || 0;
+        const tasaIVA = parseFloat(document.getElementById('tasa_iva').value) || 0;
+
+        if(!idProd || !lote || !caducidad || cant <= 0 || costoBase <= 0) {
+            alert("Faltan datos obligatorios.");
+            return;
+        }
+
+        // CÁLCULOS MATEMÁTICOS
+        const subtotal = cant * costoBase;
+        const montoIVA = subtotal * (tasaIVA / 100);
+        const totalLinea = subtotal + montoIVA;
+
+        carritoCompra.push({
+            id_producto: idProd,
+            nombre: nombreProd,
+            lote, caducidad, cantidad: cant,
+            costo: costoBase, // Costo unitario sin iva
+            subtotal, monto_iva: montoIVA, total: totalLinea
+        });
+
+        renderizarTabla();
+        
+        // LIMPIAR PARA SIGUIENTE (Mantener foco ágil)
+        document.getElementById('busc_prod').value = '';
+        document.getElementById('id_prod').value = '';
+        document.getElementById('lote').value = '';
+        document.getElementById('cant').value = '1';
+        document.getElementById('costo').value = '';
+        // No limpiamos el IVA porque usualmente es el mismo para toda la factura
+        document.getElementById('busc_prod').focus();
+    }
+
+    function renderizarTabla() {
+        const tbody = document.getElementById('tabla-body');
+        tbody.innerHTML = '';
+        
+        let sumSubtotal = 0;
+        let sumImpuestos = 0;
+        let sumTotal = 0;
+
+        carritoCompra.forEach((item, index) => {
+            sumSubtotal += item.subtotal;
+            sumImpuestos += item.monto_iva;
+            sumTotal += item.total;
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${item.nombre}</td>
+                <td><small>${item.lote}</small></td>
+                <td class="text-center">${item.cantidad}</td>
+                <td>$${item.costo.toFixed(2)}</td>
+                <td>$${item.subtotal.toFixed(2)}</td>
+                <td class="text-danger">$${item.monto_iva.toFixed(2)}</td>
+                <td class="fw-bold text-success">$${item.total.toFixed(2)}</td>
+                <td class="text-center"><button class="btn btn-sm btn-link text-danger p-0" onclick="eliminarLinea(${index})"><i class="bi bi-x-circle"></i></button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        // ACTUALIZAR TOTALES GLOBALES
+        document.getElementById('lbl-subtotal').innerText = '$' + sumSubtotal.toFixed(2);
+        document.getElementById('lbl-impuestos').innerText = '$' + sumImpuestos.toFixed(2);
+        document.getElementById('lbl-total').innerText = '$' + sumTotal.toFixed(2);
+    }
+
+    function eliminarLinea(index) {
+        carritoCompra.splice(index, 1);
+        renderizarTabla();
+    }
+
+    function guardarFactura() {
+        // ... (Validaciones básicas igual que antes) ...
+        const idProv = document.getElementById('id_prov').value;
+        const folio = document.getElementById('folio').value;
+        const fecha = document.getElementById('fecha').value;
+
+        if(!idProv || !folio || !fecha || carritoCompra.length === 0) {
+            alert("Complete los datos generales y agregue productos.");
+            return;
+        }
+
+        const datos = {
+            id_proveedor: idProv,
+            folio_factura: folio,
+            fecha_compra: fecha,
+            productos: carritoCompra
+        };
+
+        fetch('/guardar_compra', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(datos)
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.exito) {
+                alert("✅ Entrada registrada exitosamente");
+                window.location.href = "/compras";
+            } else {
+                alert("❌ Error: " + data.error);
+            }
+        })
+        .catch(err => alert("Error de conexión"));
+    }
+</script>
+
+{% endblock %}

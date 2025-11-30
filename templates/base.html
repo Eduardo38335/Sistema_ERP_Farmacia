@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Farmacia ERP</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+
+    <style>
+        /* Transición suave */
+        body { transition: background-color 0.3s ease, color 0.3s ease; }
+        
+        /* Ajustes Modo Oscuro para Select2 y Listas Flotantes */
+        [data-bs-theme="dark"] .select2-container--bootstrap-5 .select2-selection {
+            background-color: #212529; border-color: #495057; color: #fff;
+        }
+        [data-bs-theme="dark"] .select2-container--bootstrap-5 .select2-selection__rendered { color: #fff; }
+        [data-bs-theme="dark"] .select2-dropdown { background-color: #212529; border-color: #495057; color: #fff; }
+        [data-bs-theme="dark"] .select2-search__field { background-color: #2b3035; color: #fff; border-color: #495057; }
+        [data-bs-theme="dark"] .lista-flotante { background-color: #212529; border-color: #495057; color: #fff; }
+        [data-bs-theme="dark"] .item-resultado:hover { background-color: #343a40; color: #0d6efd; }
+        
+        /* Estilo del botón de tema */
+        .btn-tema { border: none; background: transparent; color: rgba(255,255,255,0.8); }
+        .btn-tema:hover { color: #fff; transform: scale(1.1); }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar navbar-expand-lg border-bottom border-body" style="background-color: var(--bs-primary-bg-subtle);">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold text-primary" href="/">🏥 Farmacia La Luz</a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active fw-bold' if request.path == '/inventario' or request.path == '/nuevo_producto' else '' }}" 
+                           href="/inventario"><i class="bi bi-box-seam"></i> Inventario</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active fw-bold' if request.path == '/ventas' else '' }}" 
+                           href="/ventas"><i class="bi bi-cart"></i> Punto de Venta</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active fw-bold' if request.path == '/compras' or request.path == '/nueva_compra' else '' }}" 
+                           href="/compras"><i class="bi bi-truck"></i> Compras</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active fw-bold' if request.path == '/ia' else '' }}" 
+                           href="/ia"><i class="bi bi-robot"></i> Asistente IA</a>
+                    </li>
+                </ul>
+
+                <button class="btn btn-tema" id="bd-theme" type="button" title="Cambiar modo Claro/Oscuro">
+                    <i class="bi bi-circle-half fs-5"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        {% block content %}
+        {% endblock %}
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+    <script>
+        (() => {
+            'use strict'
+
+            const getStoredTheme = () => localStorage.getItem('theme')
+            const setStoredTheme = theme => localStorage.setItem('theme', theme)
+
+            // Lógica: Si ya guardaste uno, usa ese. Si no, usa el de Windows.
+            const getPreferredTheme = () => {
+                const storedTheme = getStoredTheme()
+                if (storedTheme) {
+                    return storedTheme
+                }
+                return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+            }
+
+            const setTheme = theme => {
+                document.documentElement.setAttribute('data-bs-theme', theme)
+                updateIcon(theme)
+            }
+
+            const updateIcon = theme => {
+                const icon = document.querySelector('#bd-theme i');
+                if (theme === 'dark') {
+                    icon.className = 'bi bi-moon-stars-fill fs-5 text-warning'; // Luna amarilla
+                } else {
+                    icon.className = 'bi bi-sun-fill fs-5 text-warning'; // Sol amarillo
+                }
+            }
+
+            // Aplicar al iniciar
+            setTheme(getPreferredTheme())
+
+            // Acción del botón
+            document.getElementById('bd-theme').addEventListener('click', () => {
+                const currentTheme = document.documentElement.getAttribute('data-bs-theme');
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                setStoredTheme(newTheme); // ¡Aquí guardamos la elección manual!
+                setTheme(newTheme);
+            })
+
+        })()
+    </script>
+</body>
+</html>

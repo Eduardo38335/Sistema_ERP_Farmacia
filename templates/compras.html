@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h4 class="mb-0 text-primary"><i class="bi bi-truck"></i> Historial de Compras</h4>
+        <a href="/nueva_compra" class="btn btn-primary btn-sm">+ Registrar Factura</a>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Folio</th>
+                        <th>Fecha</th>
+                        <th>Proveedor</th>
+                        <th>Recibió</th>
+                        <th>Estatus</th>
+                        <th>Total ($)</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in compras %}
+                    <tr>
+                        <td><span class="badge bg-secondary">{{ c[0] }}</span></td>
+                        
+                        <td>{{ c[1] }}</td>
+                        
+                        <td class="fw-bold">{{ c[2] }}</td>
+                        
+                        <td><small class="text-muted">{{ c[4] }}</small></td>
+
+                        <td>
+                            {% if c[5] == 'RECIBIDA' %}
+                                <span class="badge bg-success">RECIBIDA</span>
+                            {% else %}
+                                <span class="badge bg-danger">{{ c[5] }}</span>
+                            {% endif %}
+                        </td>
+
+                        <td class="text-success fw-bold">${{ c[3] }}</td>
+                        
+                        <td>
+                            <button class="btn btn-outline-primary btn-sm" title="Ver Detalles">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h4 class="mb-0 text-primary">📦 Inventario Actual</h4>
+        <a href="/nuevo_producto" class="btn btn-success btn-sm">+ Nuevo Producto</a>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>SKU</th>
+                        <th>EAN / UPC</th>
+                        <th>Producto</th>
+                        <th>Descripción</th>
+                        <th>Categoría</th>
+                        <th class="text-center">Stock</th>
+                        <th>Precio</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in productos %}
+                    <tr>
+                        <td><span class="badge bg-secondary">{{ p[0] }}</span></td>
+                        
+                        <td><small class="text-muted">{{ p[1] | default ('-', true) }}</small></td>
+                        
+                        <td class="fw-bold">{{ p[2] }}</td>
+
+                        <td><small>{{ p[3] | default('Sin descripción', true) }}</small></td>
+
+                        <td><span class="badge bg-info text-dark">{{ p[4] }}</span></td>
+
+                        <td class="text-center">
+                            {% if 10 > p[5] %}
+                                <span class="badge rounded-pill bg-danger" style="font-size: 1em;">
+                                    {{ p[5] }}
+                                </span>
+                            {% else %}
+                                <span class="badge rounded-pill bg-success" style="font-size: 1em;">
+                                    {{ p[5] }}
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <td class="text-success fw-bold">${{ p[6] }}</td>
+
+                        <td>
+                            <button class="btn btn-outline-primary btn-sm" title="Ver Detalles">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
