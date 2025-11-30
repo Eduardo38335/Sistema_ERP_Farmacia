@@ -1,0 +1,217 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row h-100">
+    
+    <div class="col-md-7 col-lg-8">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-primary text-white p-3">
+                <div class="input-group input-group-lg">
+                    <span class="input-group-text bg-white text-primary border-0"><i class="bi bi-search"></i></span>
+                    <input type="text" id="buscador_pos" class="form-control border-0" placeholder="Escribe nombre o escanea código..." autofocus>
+                </div>
+            </div>
+            
+            <div class="card-body p-0" style="height: 65vh; overflow-y: auto;">
+                <table class="table table-hover align-middle mb-0" id="tabla_productos">
+                    <thead class="table-light sticky-top">
+                        <tr>
+                            <th>Producto</th>
+                            <th class="text-center">Stock</th>
+                            <th class="text-end">Precio</th>
+                            <th class="text-center">Agregar</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in productos %}
+                        <tr class="fila-producto" data-nombre="{{ p[1] | lower }}" data-sku="{{ p[0] | lower }}">
+                            <td>
+                                <div class="fw-bold">{{ p[1] }}</div> <small class="text-muted">{{ p[0] }}</small> </td>
+                            <td class="text-center">
+                                {% if p[3] > 0 %}
+                                    <span class="badge bg-success rounded-pill">{{ p[3] }}</span>
+                                {% else %}
+                                    <span class="badge bg-danger rounded-pill">0</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end text-primary fw-bold fs-5">${{ p[2] }}</td>
+                            <td class="text-center">
+                                <button class="btn btn-outline-primary btn-sm rounded-circle btn-agregar" 
+                                        {% if p[3] <= 0 %}disabled{% endif %}
+                                        onclick="agregarAlCarrito('{{p[0]}}', '{{p[1]}}', {{p[2]}}, {{p[3]}})">
+                                    <i class="bi bi-plus-lg"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-5 col-lg-4">
+        <div class="card shadow border-0 h-100 d-flex flex-column">
+            <div class="card-header bg-dark text-white text-center py-3">
+                <h5 class="mb-0"><i class="bi bi-receipt"></i> Ticket de Venta</h5>
+                <small id="fecha-hora">Fecha: --/--/----</small>
+            </div>
+            
+            <div class="card-body bg-light p-2 flex-grow-1" style="overflow-y: auto;" id="contenedor-carrito">
+                <div class="text-center text-muted mt-5" id="mensaje-vacio">
+                    <i class="bi bi-basket fs-1"></i>
+                    <p>El carrito está vacío</p>
+                </div>
+                <ul class="list-group list-group-flush" id="lista-carrito">
+                    </ul>
+            </div>
+
+            <div class="card-footer bg-white border-top p-3">
+                <div class="d-flex justify-content-between align-items-end mb-3">
+                    <span class="text-muted fs-5">Total a Pagar:</span>
+                    <span class="fw-bold text-success display-6" id="lbl-total">$0.00</span>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <button class="btn btn-success btn-lg fw-bold" onclick="cobrar()">
+                        <i class="bi bi-cash-stack"></i> COBRAR
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="limpiarCarrito()">
+                        <i class="bi bi-trash"></i> Cancelar Venta
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // 1. VARIABLES GLOBALES
+    let carrito = []; // Aquí guardaremos los productos seleccionados
+    let total = 0;
+
+    // 2. FUNCIÓN AGREGAR AL CARRITO
+    function agregarAlCarrito(sku, nombre, precio, stockMax) {
+        
+        // Buscamos si ya existe en el carrito
+        const existe = carrito.find(item => item.sku === sku);
+
+        if (existe) {
+            // Si ya existe, validamos stock
+            if (existe.cantidad < stockMax) {
+                existe.cantidad++;
+            } else {
+                alert("¡No hay suficiente stock para agregar más!");
+                return;
+            }
+        } else {
+            // Si es nuevo, lo agregamos
+            carrito.push({
+                sku: sku,
+                nombre: nombre,
+                precio: precio,
+                cantidad: 1,
+                stockMax: stockMax
+            });
+        }
+        
+        actualizarVistaCarrito();
+    }
+
+    // 3. FUNCIÓN PARA DIBUJAR EL CARRITO EN HTML
+    function actualizarVistaCarrito() {
+        const lista = document.getElementById('lista-carrito');
+        const mensaje = document.getElementById('mensaje-vacio');
+        const lblTotal = document.getElementById('lbl-total');
+        
+        lista.innerHTML = ''; // Limpiamos la lista visual
+        total = 0;
+
+        if (carrito.length === 0) {
+            mensaje.style.display = 'block';
+        } else {
+            mensaje.style.display = 'none';
+            
+            // Recorremos el carrito y creamos los elementos HTML
+            carrito.forEach((item, index) => {
+                const subtotalItem = item.cantidad * item.precio;
+                total += subtotalItem;
+
+                const li = document.createElement('li');
+                li.className = 'list-group-item d-flex justify-content-between align-items-center bg-transparent';
+                li.innerHTML = `
+                    <div class="ms-2 me-auto">
+                        <div class="fw-bold">${item.nombre}</div>
+                        <small class="text-muted">$${item.precio} x ${item.cantidad}</small>
+                    </div>
+                    <span class="badge bg-primary rounded-pill">$${subtotalItem.toFixed(2)}</span>
+                    <button class="btn btn-sm text-danger ms-2" onclick="eliminarItem(${index})"><i class="bi bi-x-circle-fill"></i></button>
+                `;
+                lista.appendChild(li);
+            });
+        }
+
+        lblTotal.innerText = '$' + total.toFixed(2);
+    }
+
+    // 4. ELIMINAR ITEM
+    function eliminarItem(index) {
+        carrito.splice(index, 1);
+        actualizarVistaCarrito();
+    }
+
+    // 5. LIMPIAR TODO
+    function limpiarCarrito() {
+        if(confirm("¿Cancelar toda la venta?")) {
+            carrito = [];
+            actualizarVistaCarrito();
+        }
+    }
+
+    // 6. BUSCADOR EN VIVO (Filtrado de tabla)
+    document.getElementById('buscador_pos').addEventListener('keyup', function() {
+        const termino = this.value.toLowerCase();
+        const filas = document.querySelectorAll('.fila-producto');
+
+        filas.forEach(fila => {
+            const nombre = fila.getAttribute('data-nombre');
+            const sku = fila.getAttribute('data-sku');
+            
+            if (nombre.includes(termino) || sku.includes(termino)) {
+                fila.style.display = '';
+            } else {
+                fila.style.display = 'none';
+            }
+        });
+    });
+
+    // 7. COBRAR (Enviar a Python)
+    function cobrar() {
+        if (carrito.length === 0) {
+            alert("El carrito está vacío");
+            return;
+        }
+
+        // Enviamos los datos al servidor usando FETCH (AJAX)
+        if(!confirm("¿Confirmar venta por $" + total.toFixed(2) + "?")) return;
+
+        fetch('/procesar_venta', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(carrito) // Convertimos el array a texto JSON
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.exito) {
+                alert("✅ ¡Venta realizada con éxito! Ticket: " + data.folio);
+                window.location.reload(); // Recargar para actualizar stock
+            } else {
+                alert("❌ Error: " + data.error);
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    }
+</script>
+
+{% endblock %}

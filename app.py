@@ -220,12 +220,138 @@ def guardar_compra():
         conn.rollback()
         print(f"Error: {e}")
         return {'exito': False, 'error': str(e)}
+
+        
     
     finally:
         cursor.close()
         conn.close()
-        
+        # 8. PANTALLA PUNTO DE VENTA (POS)
+@app.route('/ventas')
+def ventas():
+    conn = mysql.connector.connect(**DB_CONFIG)
+    cursor = conn.cursor()
+    
+    # Traemos productos con su precio y stock para mostrarlos en el buscador
+    # Nota: Ordenamos por nombre para facilitar búsqueda visual
+    query = """
+        SELECT 
+            p.sku, 
+            p.nombre, 
+            p.precio_venta, 
+            IFNULL(SUM(l.stock_actual), 0) as stock
+        FROM productos p
+        LEFT JOIN lotes l ON p.id_producto = l.id_producto
+        WHERE p.estatus = 1
+        GROUP BY p.id_producto
+        ORDER BY p.nombre ASC;
+    """
+    
+    cursor.execute(query)
+    lista_productos = cursor.fetchall()
+    conn.close()
+    
+    
+    return render_template('ventas.html', productos=lista_productos)
     return redirect(url_for('compras'))
+# 9. PROCESAR VENTA (EL CEREBRO FEFO)
+@app.route('/procesar_venta', methods=['POST'])
+def procesar_venta():
+    carrito = request.get_json() # Recibimos la lista del carrito
+    
+    if not carrito:
+        return {'exito': False, 'error': 'Carrito vacío'}
+
+    conn = mysql.connector.connect(**DB_CONFIG)
+    cursor = conn.cursor()
+    
+    try:
+        # 1. Calcular totales generales para el Encabezado
+        total_venta = sum(item['cantidad'] * item['precio'] for item in carrito)
+        subtotal = total_venta # (Simplificado, aquí podrías desglosar IVA si quisieras)
+        impuestos = 0
+        
+        # 2. Crear el Ticket (Encabezado)
+        # Usamos Cliente 1 (Público General) y Usuario 1 (Admin) por defecto
+        # Generamos un folio temporal con la fecha
+        import datetime
+        folio_ticket = "T-" + datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        
+        sql_header = """INSERT INTO ventas_encabezado 
+                        (folio_ticket, id_cliente, id_usuario, subtotal, impuestos, total, forma_pago) 
+                        VALUES (%s, 1, 1, %s, %s, %s, 'Efectivo')"""
+        cursor.execute(sql_header, (folio_ticket, subtotal, impuestos, total_venta))
+        id_venta_nueva = cursor.lastrowid
+        
+        # 3. PROCESAR CADA PRODUCTO (LÓGICA FEFO)
+        for item in carrito:
+            sku = item['sku']
+            cantidad_necesitada = int(item['cantidad'])
+            precio_venta = item['precio']
+            
+            # A. Buscamos el ID del producto
+            cursor.execute("SELECT id_producto, nombre FROM productos WHERE sku = %s", (sku,))
+            prod_db = cursor.fetchone()
+            if not prod_db:
+                raise Exception(f"Producto {sku} no encontrado")
+            
+            id_producto = prod_db[0]
+            nombre_prod = prod_db[1]
+            
+            # B. ALGORITMO FEFO: Traer lotes con stock, ordenados por caducidad (el más viejo primero)
+            sql_lotes = """SELECT id_lote, stock_actual, numero_lote 
+                           FROM lotes 
+                           WHERE id_producto = %s AND stock_actual > 0 
+                           ORDER BY fecha_caducidad ASC"""
+            cursor.execute(sql_lotes, (id_producto,))
+            lotes_disponibles = cursor.fetchall()
+            
+            cantidad_pendiente = cantidad_necesitada
+            
+            # C. Descontar de los lotes uno por uno
+            for lote in lotes_disponibles:
+                id_lote = lote[0]
+                stock_lote = lote[1]
+                
+                if cantidad_pendiente <= 0:
+                    break # Ya surtimos todo
+                
+                # Definir cuánto tomamos de este lote
+                a_tomar = min(cantidad_pendiente, stock_lote)
+                
+                # Actualizar Lote en BD (Resta)
+                cursor.execute("UPDATE lotes SET stock_actual = stock_actual - %s WHERE id_lote = %s", (a_tomar, id_lote))
+                
+                # Guardar en Detalle de Venta
+                importe_linea = a_tomar * precio_venta
+                sql_detalle = """INSERT INTO ventas_detalle 
+                                 (id_venta, id_producto, id_lote, cantidad, precio_unitario, importe) 
+                                 VALUES (%s, %s, %s, %s, %s, %s)"""
+                cursor.execute(sql_detalle, (id_venta_nueva, id_producto, id_lote, a_tomar, precio_venta, importe_linea))
+                
+                # Registrar en Kárdex (Salida)
+                sql_kardex = """INSERT INTO movimientos_inventario 
+                                (id_producto, id_lote, tipo_movimiento, id_motivo, cantidad, stock_anterior, stock_resultante, id_usuario) 
+                                VALUES (%s, %s, 'SALIDA', 2, %s, %s, %s, 1)""" # Motivo 2 = Venta
+                cursor.execute(sql_kardex, (id_producto, id_lote, a_tomar, stock_lote, stock_lote - a_tomar))
+                
+                cantidad_pendiente -= a_tomar
+            
+            # D. Validación final: ¿Alcanzó el stock?
+            if cantidad_pendiente > 0:
+                raise Exception(f"No hay suficiente stock para {nombre_prod}. Faltaron {cantidad_pendiente}.")
+
+        conn.commit()
+        return {'exito': True, 'folio': folio_ticket}
+
+    except Exception as e:
+        conn.rollback()
+        print(f"Error en venta: {e}")
+        return {'exito': False, 'error': str(e)}
+    
+    finally:
+        cursor.close()
+        conn.close()
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
