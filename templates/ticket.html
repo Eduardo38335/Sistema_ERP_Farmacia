@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Ticket de Venta</title>
+    <style>
+        /* ESTILOS PARA IMPRESORA TÉRMICA */
+        body {
+            font-family: 'Courier New', Courier, monospace; /* Fuente tipo máquina de escribir */
+            font-size: 12px;
+            margin: 0;
+            padding: 5px;
+            width: 80mm; /* Ancho estándar de impresora térmica */
+            color: black;
+            background: white;
+        }
+        
+        .centrado { text-align: center; }
+        .derecha { text-align: right; }
+        .negrita { font-weight: bold; }
+        
+        /* Línea punteada separadora */
+        .linea { 
+            border-top: 1px dashed black; 
+            margin: 5px 0; 
+        }
+        
+        /* Tabla de productos */
+        table { width: 100%; border-collapse: collapse; }
+        td, th { vertical-align: top; }
+        
+        /* Ocultar el botón al imprimir en papel */
+        @media print {
+            .no-print { display: none; }
+        }
+
+        .btn-imprimir {
+            width: 100%;
+            background: black;
+            color: white;
+            padding: 10px;
+            cursor: pointer;
+            border: none;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <button class="btn-imprimir no-print" onclick="window.print()">🖨️ IMPRIMIR TICKET</button>
+
+    <div class="centrado">
+        <h3>FARMACIA LA LUZ</h3>
+        <p>Av. Principal #123, Centro<br>
+        Tel: 55-1234-5678<br>
+        RFC: XAXX010101000</p>
+    </div>
+
+    <div class="linea"></div>
+
+    <div>
+        <strong>Folio:</strong> {{ venta.folio_ticket }}<br>
+        <strong>Fecha:</strong> {{ venta.fecha_venta }}<br>
+        <strong>Le atendió:</strong> {{ venta.vendedor }}
+    </div>
+
+    <div class="linea"></div>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="text-align: left;">Cant.</th>
+                <th style="text-align: left;">Producto</th>
+                <th class="derecha">Importe</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in detalles %}
+            <tr>
+                <td>{{ item[0] }}</td> <td>
+                    {{ item[1] }} <br><small>Lote: {{ item[2] }}</small>
+                </td>
+                <td class="derecha">${{ item[3] }}</td> </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="linea"></div>
+
+    <table>
+        <tr>
+            <td class="derecha negrita" style="font-size: 14px;">TOTAL:</td>
+            <td class="derecha negrita" style="font-size: 14px;">${{ venta.total }}</td>
+        </tr>
+        <tr>
+            <td class="derecha">Su Pago:</td>
+            <td class="derecha">Efectivo</td>
+        </tr>
+    </table>
+
+    <div class="linea"></div>
+
+    <div class="centrado">
+        <p>¡GRACIAS POR SU COMPRA!<br>
+        Revise su producto antes de salir.<br>
+        No hay cambios en antibióticos.</p>
+        <small>Sistema ERP v1.0</small>
+    </div>
+
+    <script>
+        window.onload = function() {
+            window.print();
+        }
+    </script>
+
+</body>
+</html>

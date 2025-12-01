@@ -3,45 +3,71 @@
 {% block content %}
 
 <style>
-    /* Estilo para item activo con teclado */
-    .item-resultado.active {
-        background-color: #0d6efd;
-        color: white;
+    /* === CORRECCIÓN VISUAL PARA MODO OSCURO/CLARO === */
+    
+    /* Inputs adaptativos (Se arregla el problema de cajas negras) */
+    .form-control, .form-select {
+        background-color: var(--bs-body-bg); 
+        color: var(--bs-body-color);
+        border-color: var(--bs-border-color);
     }
     
-    /* Tabla compacta */
-    .tabla-captura th { background: #343a40; color: white; font-size: 0.85rem; text-align: right; }
+    .form-control:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+
+    /* Tabla compacta y legible */
+    .tabla-captura th { background: #212529; color: white; font-size: 0.85rem; text-align: right; }
     .tabla-captura td { text-align: right; vertical-align: middle; }
     .tabla-captura td:first-child, .tabla-captura th:first-child { text-align: left; }
-    
-    /* Inputs limpios */
-    input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-    input[type=number] { -moz-appearance: textfield; }
 
+    /* Lista Flotante (Buscador) */
     .lista-flotante {
-        position: absolute; z-index: 1000; width: 100%; max-height: 200px;
-        overflow-y: auto; background: white; border: 1px solid #ced4da; display: none;
+        position: absolute; 
+        z-index: 1050; 
+        width: 100%; 
+        max-height: 200px;
+        overflow-y: auto; 
+        border: 1px solid var(--bs-border-color); 
+        border-radius: 0.375rem;
+        background-color: var(--bs-body-bg); 
+        display: none;
     }
-    .item-resultado { padding: 8px 12px; border-bottom: 1px solid #eee; cursor: pointer; }
-    .item-resultado:hover { background-color: #e9ecef; }
+    
+    .item-resultado { 
+        padding: 8px 12px; 
+        border-bottom: 1px solid var(--bs-border-color); 
+        cursor: pointer; 
+        color: var(--bs-body-color);
+    }
+    
+    .item-resultado:hover, .item-resultado.active { 
+        background-color: var(--bs-primary); 
+        color: white; 
+    }
+
+    /* Quitar flechas de inputs numéricos */
+    input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 </style>
 
 <div class="card shadow-lg border-0">
-    <div class="card-header bg-primary text-white">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="bi bi-receipt"></i> Nueva Factura de Compra</h5>
     </div>
-    <div class="card-body bg-light">
+    <div class="card-body">
         
-        <div class="row mb-3 p-3 bg-white border rounded">
+        <div class="row mb-3 p-3 border rounded shadow-sm" style="background-color: var(--bs-tertiary-bg);">
             <div class="col-md-4 position-relative">
                 <label class="fw-bold small">Proveedor</label>
-                <input type="text" id="busc_prov" class="form-control" placeholder="Buscar..." autocomplete="off">
+                <input type="text" id="busc_prov" class="form-control" placeholder="Buscar proveedor..." autocomplete="off">
                 <input type="hidden" id="id_prov">
                 <div id="lista_prov" class="lista-flotante"></div>
             </div>
             <div class="col-md-4">
                 <label class="fw-bold small">Folio Factura</label>
-                <input type="text" id="folio" class="form-control">
+                <input type="text" id="folio" class="form-control" placeholder="Ej: F-12345">
             </div>
             <div class="col-md-4">
                 <label class="fw-bold small">Fecha</label>
@@ -77,21 +103,23 @@
                 <input type="number" id="tasa_iva" class="form-control text-center" value="0" onfocus="this.select()">
             </div>
             <div class="col-md-1">
-                <button class="btn btn-success w-100" onclick="agregarLinea()"><i class="bi bi-plus-lg"></i></button>
+                <button class="btn btn-success w-100" onclick="agregarLinea()">
+                    <i class="bi bi-plus-lg"></i>
+                </button>
             </div>
         </div>
 
-        <div class="table-responsive bg-white border rounded mb-3" style="min-height: 200px;">
+        <div class="table-responsive border rounded mb-3" style="min-height: 200px;">
             <table class="table table-hover table-sm tabla-captura mb-0">
                 <thead>
                     <tr>
                         <th>Producto</th>
                         <th>Lote</th>
                         <th>Cant.</th>
-                        <th>Costo U.</th>
-                        <th>Subtotal</th>
-                        <th>IVA</th>
-                        <th>Total</th>
+                        <th class="text-end">Costo U.</th>
+                        <th class="text-end">Subtotal</th>
+                        <th class="text-end">IVA</th>
+                        <th class="text-end">Total</th>
                         <th></th>
                     </tr>
                 </thead>
@@ -101,7 +129,7 @@
 
         <div class="row justify-content-end mb-3">
             <div class="col-md-4">
-                <table class="table table-sm table-borderless text-end mb-0">
+                <table class="table table-sm table-borderless text-end mb-0" style="background: transparent;">
                     <tr>
                         <td>Subtotal:</td>
                         <td class="fw-bold" id="lbl-subtotal">$0.00</td>
@@ -110,7 +138,7 @@
                         <td>Impuestos:</td>
                         <td class="fw-bold text-danger" id="lbl-impuestos">$0.00</td>
                     </tr>
-                    <tr class="border-top">
+                    <tr class="border-top border-secondary">
                         <td class="fs-5">Total Factura:</td>
                         <td class="fs-5 fw-bold text-success" id="lbl-total">$0.00</td>
                     </tr>
@@ -129,16 +157,15 @@
 </div>
 
 <script>
-    // DATOS DE PYTHON
+    // DATOS DE PYTHON A JS
     const listaProveedores = [{% for p in proveedores %} { id: "{{p[0]}}", texto: "{{p[1]}}" }, {% endfor %}];
     const listaProductos = [{% for p in productos %} { id: "{{p[0]}}", texto: "{{p[1]}}" }, {% endfor %}];
 
-    // ESTADO DE LA FACTURA
     let carritoCompra = [];
     
-    // --- INICIALIZAR BUSCADORES CON TECLADO ---
+    // INICIALIZAR BUSCADORES
     initLiveSearch('busc_prov', 'id_prov', 'lista_prov', listaProveedores);
-    initLiveSearch('busc_prod', 'id_prod', 'lista_prod', listaProductos, true); // true = es producto
+    initLiveSearch('busc_prod', 'id_prod', 'lista_prod', listaProductos, true);
 
     function initLiveSearch(inputId, hiddenId, listId, data, isProduct=false) {
         const input = document.getElementById(inputId);
@@ -150,6 +177,7 @@
             const term = this.value.toLowerCase();
             list.innerHTML = '';
             currentFocus = -1;
+            hidden.value = ''; // Limpiar ID si el usuario borra texto
             
             if (term.length < 1) { list.style.display = 'none'; return; }
 
@@ -161,9 +189,7 @@
                     const div = document.createElement('div');
                     div.className = 'item-resultado';
                     div.innerText = item.texto;
-                    div.addEventListener('click', function() {
-                        selectItem(item);
-                    });
+                    div.onclick = () => selectItem(item, input, hidden, list, isProduct);
                     list.appendChild(div);
                 });
             } else {
@@ -171,7 +197,7 @@
             }
         });
 
-        // NAVEGACIÓN CON TECLADO (FLECHAS Y ENTER)
+        // NAVEGACIÓN TECLADO
         input.addEventListener('keydown', function(e) {
             let items = list.getElementsByTagName('div');
             if (e.key === 'ArrowDown') {
@@ -185,10 +211,14 @@
                 if (currentFocus > -1) {
                     if (items) items[currentFocus].click();
                 } else if (items.length === 1) {
-                    // Si solo hay 1 resultado y das enter, lo selecciona
-                    items[0].click();
+                    items[0].click(); // Auto-select si solo hay 1
                 }
             }
+        });
+
+        // CERRAR AL CLIC FUERA
+        document.addEventListener('click', function (e) {
+            if (e.target !== input) list.style.display = 'none';
         });
 
         function addActive(x) {
@@ -197,36 +227,22 @@
             if (currentFocus >= x.length) currentFocus = 0;
             if (currentFocus < 0) currentFocus = (x.length - 1);
             x[currentFocus].classList.add('active');
-            // Scroll automático para seguir la selección
             x[currentFocus].scrollIntoView({ block: 'nearest' });
         }
-
         function removeActive(x) {
-            for (let i = 0; i < x.length; i++) {
-                x[i].classList.remove('active');
-            }
+            for (let i = 0; i < x.length; i++) { x[i].classList.remove('active'); }
         }
-
-        function selectItem(item) {
-            input.value = item.texto;
-            hidden.value = item.id;
-            list.style.display = 'none';
-            
-            // SALTO INTELIGENTE AL SIGUIENTE CAMPO
-            if (isProduct) {
-                document.getElementById('lote').focus();
-            } else {
-                document.getElementById('folio').focus();
-            }
-        }
-        
-        // Cerrar al hacer clic fuera
-        document.addEventListener('click', function (e) {
-            if (e.target !== input) list.style.display = 'none';
-        });
     }
 
-    // --- AGREGAR LINEA (CON CÁLCULOS FISCALES) ---
+    function selectItem(item, input, hidden, list, isProduct) {
+        input.value = item.texto;
+        hidden.value = item.id;
+        list.style.display = 'none';
+        if (isProduct) document.getElementById('lote').focus();
+        else document.getElementById('folio').focus();
+    }
+
+    // --- AGREGAR LINEA (CORREGIDO IVA PORCENTUAL) ---
     function agregarLinea() {
         const idProd = document.getElementById('id_prod').value;
         const nombreProd = document.getElementById('busc_prod').value;
@@ -237,33 +253,33 @@
         const costoBase = parseFloat(document.getElementById('costo').value) || 0;
         const tasaIVA = parseFloat(document.getElementById('tasa_iva').value) || 0;
 
-        if(!idProd || !lote || !caducidad || cant <= 0 || costoBase <= 0) {
-            alert("Faltan datos obligatorios.");
-            return;
-        }
+        if(!idProd) { alert("⚠️ Seleccione un producto válido de la lista."); return; }
+        if(!lote) { alert("⚠️ Escriba el Lote."); return; }
+        if(!caducidad) { alert("⚠️ Seleccione la fecha de caducidad."); return; }
+        if(cant <= 0) { alert("⚠️ La cantidad debe ser mayor a 0."); return; }
+        if(costoBase <= 0) { alert("⚠️ El costo debe ser mayor a 0."); return; }
 
-        // CÁLCULOS MATEMÁTICOS
+        // CÁLCULOS MATEMÁTICOS CORREGIDOS
         const subtotal = cant * costoBase;
-        const montoIVA = subtotal * (tasaIVA / 100);
+        const montoIVA = subtotal * (tasaIVA / 100); // 16% de 100 = 16
         const totalLinea = subtotal + montoIVA;
 
         carritoCompra.push({
             id_producto: idProd,
             nombre: nombreProd,
             lote, caducidad, cantidad: cant,
-            costo: costoBase, // Costo unitario sin iva
+            costo: costoBase,
             subtotal, monto_iva: montoIVA, total: totalLinea
         });
 
         renderizarTabla();
         
-        // LIMPIAR PARA SIGUIENTE (Mantener foco ágil)
+        // Limpiar campos para siguiente producto
         document.getElementById('busc_prod').value = '';
         document.getElementById('id_prod').value = '';
         document.getElementById('lote').value = '';
         document.getElementById('cant').value = '1';
         document.getElementById('costo').value = '';
-        // No limpiamos el IVA porque usualmente es el mismo para toda la factura
         document.getElementById('busc_prod').focus();
     }
 
@@ -285,16 +301,15 @@
                 <td>${item.nombre}</td>
                 <td><small>${item.lote}</small></td>
                 <td class="text-center">${item.cantidad}</td>
-                <td>$${item.costo.toFixed(2)}</td>
-                <td>$${item.subtotal.toFixed(2)}</td>
-                <td class="text-danger">$${item.monto_iva.toFixed(2)}</td>
-                <td class="fw-bold text-success">$${item.total.toFixed(2)}</td>
+                <td class="text-end">$${item.costo.toFixed(2)}</td>
+                <td class="text-end">$${item.subtotal.toFixed(2)}</td>
+                <td class="text-end text-danger">$${item.monto_iva.toFixed(2)}</td>
+                <td class="text-end fw-bold text-success">$${item.total.toFixed(2)}</td>
                 <td class="text-center"><button class="btn btn-sm btn-link text-danger p-0" onclick="eliminarLinea(${index})"><i class="bi bi-x-circle"></i></button></td>
             `;
             tbody.appendChild(tr);
         });
 
-        // ACTUALIZAR TOTALES GLOBALES
         document.getElementById('lbl-subtotal').innerText = '$' + sumSubtotal.toFixed(2);
         document.getElementById('lbl-impuestos').innerText = '$' + sumImpuestos.toFixed(2);
         document.getElementById('lbl-total').innerText = '$' + sumTotal.toFixed(2);
@@ -305,16 +320,30 @@
         renderizarTabla();
     }
 
+    // --- GUARDAR FACTURA ---
     function guardarFactura() {
-        // ... (Validaciones básicas igual que antes) ...
-        const idProv = document.getElementById('id_prov').value;
+        const inputProv = document.getElementById('busc_prov');
+        const hiddenProv = document.getElementById('id_prov');
+        
+        // Auto-selección si el texto coincide
+        if (!hiddenProv.value && inputProv.value) {
+            const match = listaProveedores.find(p => p.texto.toLowerCase() === inputProv.value.toLowerCase());
+            if (match) hiddenProv.value = match.id;
+        }
+
+        const idProv = hiddenProv.value;
         const folio = document.getElementById('folio').value;
         const fecha = document.getElementById('fecha').value;
 
-        if(!idProv || !folio || !fecha || carritoCompra.length === 0) {
-            alert("Complete los datos generales y agregue productos.");
-            return;
+        if(!idProv) { 
+            alert("⚠️ Error: Debes seleccionar un PROVEEDOR válido de la lista."); 
+            inputProv.focus();
+            inputProv.style.borderColor = "red";
+            return; 
         }
+        if(!folio) { alert("⚠️ Falta el Folio de la Factura."); return; }
+        if(!fecha) { alert("⚠️ Falta la Fecha de Compra."); return; }
+        if(carritoCompra.length === 0) { alert("⚠️ La factura está vacía. Agrega productos."); return; }
 
         const datos = {
             id_proveedor: idProv,
@@ -331,13 +360,13 @@
         .then(res => res.json())
         .then(data => {
             if(data.exito) {
-                alert("✅ Entrada registrada exitosamente");
+                alert("✅ Factura guardada correctamente");
                 window.location.href = "/compras";
             } else {
                 alert("❌ Error: " + data.error);
             }
         })
-        .catch(err => alert("Error de conexión"));
+        .catch(err => alert("Error de conexión: " + err));
     }
 </script>
 

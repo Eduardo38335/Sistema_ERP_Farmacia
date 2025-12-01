@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 import mysql.connector
 from functools import wraps
 import datetime 
+from flask import jsonify
 
 # Importamos tu configuración (asegúrate que config.py esté bien)
 from config import DB_CONFIG 
@@ -154,23 +155,83 @@ def guardar_usuario():
 # ==========================================
 # 📦 MÓDULO INVENTARIO Y PRODUCTOS
 # ==========================================
+# 2. VER INVENTARIO (CON ALERTA DE CADUCIDAD)
 @app.route('/inventario')
 @login_required
 def inventario():
     conn = mysql.connector.connect(**DB_CONFIG)
     cursor = conn.cursor()
+    
+    # LÓGICA INTELIGENTE:
+    # 1. stock_vigente: Suma solo si fecha >= HOY
+    # 2. stock_caducado: Suma solo si fecha < HOY
     query = """
-        SELECT p.sku, p.upc, p.nombre, p.descripcion, c.nombre, 
-               IFNULL(SUM(l.stock_actual), 0), p.precio_venta
+        SELECT 
+            p.sku,                          -- [0]
+            p.upc,                          -- [1]
+            p.nombre,                       -- [2]
+            p.descripcion,                  -- [3]
+            c.nombre as categoria,          -- [4]
+            
+            -- [5] STOCK VIGENTE (LO QUE SÍ PUEDES VENDER)
+            IFNULL(SUM(CASE WHEN l.fecha_caducidad >= CURDATE() THEN l.stock_actual ELSE 0 END), 0) as stock_vigente,
+            
+            p.precio_venta,                 -- [6]
+            p.id_producto,                  -- [7]
+            
+            -- [8] STOCK CADUCADO (ALERTA DE MERMA)
+            IFNULL(SUM(CASE WHEN l.fecha_caducidad < CURDATE() THEN l.stock_actual ELSE 0 END), 0) as stock_caducado
+            
         FROM productos p
         LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
         LEFT JOIN lotes l ON p.id_producto = l.id_producto
         GROUP BY p.id_producto;
     """
+    
     cursor.execute(query)
     lista = cursor.fetchall()
     conn.close()
     return render_template('inventario.html', productos=lista)
+
+# RUTA PARA OBTENER DETALLES (AJAX)
+@app.route('/api/producto/<int:id_prod>')
+@login_required
+def obtener_detalle_producto(id_prod):
+    conn = mysql.connector.connect(**DB_CONFIG)
+    cursor = conn.cursor(dictionary=True) # Importante: Diccionario para usar nombres en JS
+    
+    # Consulta Maestra: Une todas las tablas para tener los nombres reales
+    sql = """
+        SELECT 
+            p.*, 
+            c.nombre as cat_nombre,
+            l.nombre as lab_nombre,
+            pres.nombre as pres_nombre,
+            u.nombre as uni_nombre,
+            (SELECT IFNULL(SUM(stock_actual), 0) FROM lotes WHERE id_producto = p.id_producto) as stock_real
+        FROM productos p
+        LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
+        LEFT JOIN laboratorios l ON p.id_laboratorio = l.id_laboratorio
+        LEFT JOIN presentaciones pres ON p.id_presentacion = pres.id_presentacion
+        LEFT JOIN unidades_medida u ON p.id_unidad = u.id_unidad
+        WHERE p.id_producto = %s
+    """
+    cursor.execute(sql, (id_prod,))
+    producto = cursor.fetchone()
+    
+    # También traemos el desglose de lotes (Para ver qué caduca pronto)
+    sql_lotes = """
+        SELECT numero_lote, fecha_caducidad, stock_actual 
+        FROM lotes 
+        WHERE id_producto = %s AND stock_actual > 0 
+        ORDER BY fecha_caducidad ASC
+    """
+    cursor.execute(sql_lotes, (id_prod,))
+    lotes = cursor.fetchall()
+    
+    conn.close()
+    
+    return jsonify({'producto': producto, 'lotes': lotes})
 
 @app.route('/nuevo_producto')
 @login_required
@@ -287,58 +348,106 @@ def ventas():
     conn.close()
     return render_template('ventas.html', productos=lista)
 
+# 9. PROCESAR VENTA (CON DETECCIÓN DE CADUCIDAD Y SELECCIÓN MANUAL)
 @app.route('/procesar_venta', methods=['POST'])
 @login_required
 def procesar_venta():
     carrito = request.get_json()
     id_usuario = session['user_id']
+    
     if not carrito: return {'exito': False, 'error': 'Carrito vacío'}
 
     conn = mysql.connector.connect(**DB_CONFIG)
     cursor = conn.cursor()
+    
     try:
-        # Totales
+        # 1. Totales (Esto sigue igual)
         total_venta = sum(item['cantidad'] * item['precio'] for item in carrito)
         folio = "T-" + datetime.datetime.now().strftime("%Y%m%d%H%M%S")
         
-        # Encabezado
+        # 2. Insertar Encabezado
         cursor.execute("INSERT INTO ventas_encabezado (folio_ticket, id_cliente, id_usuario, subtotal, impuestos, total, forma_pago) VALUES (%s, 1, %s, %s, 0, %s, 'Efectivo')", 
                        (folio, id_usuario, total_venta, total_venta))
         id_venta = cursor.lastrowid
         
-        # Procesar Items (Lógica FEFO)
+        # 3. PROCESAR ITEMS
+        hoy = datetime.date.today()
+        
         for item in carrito:
             sku = item['sku']
-            qty = int(item['cantidad'])
+            qty_necesaria = int(item['cantidad'])
             
-            # Buscar ID producto
-            cursor.execute("SELECT id_producto FROM productos WHERE sku = %s", (sku,))
-            id_prod = cursor.fetchone()[0]
+            # Obtener ID producto
+            cursor.execute("SELECT id_producto, nombre FROM productos WHERE sku = %s", (sku,))
+            res_prod = cursor.fetchone()
+            id_prod = res_prod[0]
+            nombre_prod = res_prod[1]
             
-            # Buscar lotes (FEFO)
-            cursor.execute("SELECT id_lote, stock_actual FROM lotes WHERE id_producto = %s AND stock_actual > 0 ORDER BY fecha_caducidad ASC", (id_prod,))
+            # --- NUEVA LÓGICA: ¿VIENE CON LOTE FORZADO? ---
+            lote_manual_id = item.get('id_lote_manual') # Puede venir None o un ID
+            
+            if lote_manual_id:
+                # A) EL USUARIO ELIGIÓ UN LOTE MANUALMENTE (Ignoramos caducidad, confiamos en el usuario)
+                sql_lotes = "SELECT id_lote, stock_actual FROM lotes WHERE id_lote = %s"
+                cursor.execute(sql_lotes, (lote_manual_id,))
+            else:
+                # B) AUTOMÁTICO (FEFO): Buscar lotes ordenados por caducidad
+                # Traemos fecha_caducidad también para validar
+                sql_lotes = "SELECT id_lote, stock_actual, fecha_caducidad, numero_lote FROM lotes WHERE id_producto = %s AND stock_actual > 0 ORDER BY fecha_caducidad ASC"
+                cursor.execute(sql_lotes, (id_prod,))
+            
             lotes = cursor.fetchall()
             
-            pendiente = qty
+            # --- VALIDACIÓN DE CADUCIDAD (Solo si es automático) ---
+            if not lote_manual_id and lotes:
+                primer_lote = lotes[0] # El más viejo
+                fecha_lote = primer_lote[2] # fecha_caducidad
+                
+                # SI ESTÁ CADUCADO -> DETENEMOS LA VENTA Y PEDIMOS AYUDA
+                if fecha_lote < hoy:
+                    conn.rollback() # Cancelamos lo que llevábamos
+                    
+                    # Preparamos la lista de lotes para mandarla al frontend
+                    lotes_para_mostrar = []
+                    for l in lotes:
+                        lotes_para_mostrar.append({
+                            'id_lote': l[0],
+                            'stock': l[1],
+                            'fecha': str(l[2]),
+                            'numero': l[3],
+                            'caducado': l[2] < hoy # True/False
+                        })
+                        
+                    return {
+                        'exito': False, 
+                        'error': 'CADUCIDAD_DETECTADA', # Código especial
+                        'producto': nombre_prod,
+                        'sku_problematico': sku,
+                        'lotes_disponibles': lotes_para_mostrar
+                    }
+
+            # --- DESCUENTO DE STOCK (Igual que antes) ---
+            pendiente = qty_necesaria
             for lote in lotes:
                 if pendiente <= 0: break
-                id_lote, stock = lote
+                id_lote = lote[0]
+                stock = lote[1]
+                
                 tomar = min(pendiente, stock)
                 
-                # Descontar Stock
                 cursor.execute("UPDATE lotes SET stock_actual = stock_actual - %s WHERE id_lote = %s", (tomar, id_lote))
-                # Guardar Detalle
                 cursor.execute("INSERT INTO ventas_detalle (id_venta, id_producto, id_lote, cantidad, precio_unitario, importe) VALUES (%s, %s, %s, %s, %s, %s)", 
                                (id_venta, id_prod, id_lote, tomar, item['precio'], tomar * item['precio']))
-                # Kárdex Salida
                 cursor.execute("INSERT INTO movimientos_inventario (id_producto, id_lote, tipo_movimiento, id_motivo, cantidad, stock_anterior, stock_resultante, id_usuario) VALUES (%s, %s, 'SALIDA', 2, %s, %s, %s, %s)", 
                                (id_prod, id_lote, tomar, stock, stock - tomar, id_usuario))
+                
                 pendiente -= tomar
             
             if pendiente > 0: raise Exception(f"Stock insuficiente para {sku}")
 
         conn.commit()
         return {'exito': True, 'folio': folio}
+        
     except Exception as e:
         conn.rollback()
         return {'exito': False, 'error': str(e)}
@@ -350,16 +459,29 @@ def procesar_venta():
 @login_required
 def ticket(folio):
     conn = mysql.connector.connect(**DB_CONFIG)
+    
+    # 1. Datos del Encabezado
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT v.folio_ticket, v.fecha_venta, v.total, u.username as vendedor FROM ventas_encabezado v JOIN usuarios u ON v.id_usuario = u.id_usuario WHERE v.folio_ticket = %s", (folio,))
+    sql_head = """SELECT v.folio_ticket, v.fecha_venta, v.total, u.username as vendedor 
+                  FROM ventas_encabezado v 
+                  JOIN usuarios u ON v.id_usuario = u.id_usuario 
+                  WHERE v.folio_ticket = %s"""
+    cursor.execute(sql_head, (folio,))
     venta = cursor.fetchone()
     
-    cursor2 = conn.cursor() # Cursor normal para detalles
-    cursor2.execute("SELECT d.cantidad, p.nombre, l.numero_lote, d.importe FROM ventas_detalle d JOIN productos p ON d.id_producto = p.id_producto JOIN lotes l ON d.id_lote = l.id_lote WHERE d.id_venta = (SELECT id_venta FROM ventas_encabezado WHERE folio_ticket = %s)", (folio,))
+    # 2. Datos del Detalle
+    cursor2 = conn.cursor() # Cursor normal (tuplas) para la tabla simple
+    sql_det = """SELECT d.cantidad, p.nombre, l.numero_lote, d.importe 
+                 FROM ventas_detalle d 
+                 JOIN productos p ON d.id_producto = p.id_producto 
+                 JOIN lotes l ON d.id_lote = l.id_lote 
+                 WHERE d.id_venta = (SELECT id_venta FROM ventas_encabezado WHERE folio_ticket = %s)"""
+    cursor2.execute(sql_det, (folio,))
     detalles = cursor2.fetchall()
     
     conn.close()
     return render_template('ticket.html', venta=venta, detalles=detalles)
+
 
 # 14. MÓDULO IA
 @app.route('/ia')

@@ -4,7 +4,9 @@
 <div class="card shadow-sm">
     <div class="card-header bg-white d-flex justify-content-between align-items-center">
         <h4 class="mb-0 text-primary">📦 Inventario Actual</h4>
-        <a href="/nuevo_producto" class="btn btn-success btn-sm">+ Nuevo Producto</a>
+        {% if session['rol'] == 1 %}
+            <a href="/nuevo_producto" class="btn btn-success btn-sm">+ Nuevo Producto</a>
+        {% endif %}
     </div>
     <div class="card-body">
         <div class="table-responsive">
@@ -17,47 +19,156 @@
                         <th>Descripción</th>
                         <th>Categoría</th>
                         <th class="text-center">Stock</th>
-                        <th>Precio</th>
+                        <th>Precio Venta</th>
                         <th>Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for p in productos %}
                     <tr>
-                        <td><span class="badge bg-secondary">{{ p[0] }}</span></td>
-                        
-                        <td><small class="text-muted">{{ p[1] | default ('-', true) }}</small></td>
-                        
-                        <td class="fw-bold">{{ p[2] }}</td>
-
-                        <td><small>{{ p[3] | default('Sin descripción', true) }}</small></td>
-
-                        <td><span class="badge bg-info text-dark">{{ p[4] }}</span></td>
-
-                        <td class="text-center">
-                            {% if 10 > p[5] %}
-                                <span class="badge rounded-pill bg-danger" style="font-size: 1em;">
+                        <td><span class="badge bg-secondary">{{ p[0] }}</span></td> <td><small class="text-muted">{{ p[1] | default('-', true) }}</small></td> <td class="fw-bold">{{ p[2] }}</td> <td><small>{{ p[3] | default('Sin descripción', true) }}</small></td> <td><span class="badge bg-info text-dark">{{ p[4] }}</span></td> <td class="text-center">
+                            {% if p[5] > 10 %}
+                                <span class="badge rounded-pill bg-success" style="font-size: 0.9em;">
+                                    {{ p[5] }}
+                                </span>
+                            {% elif p[5] > 0 %}
+                                <span class="badge rounded-pill bg-warning text-dark" style="font-size: 0.9em;">
                                     {{ p[5] }}
                                 </span>
                             {% else %}
-                                <span class="badge rounded-pill bg-success" style="font-size: 1em;">
-                                    {{ p[5] }}
-                                </span>
+                                <span class="badge rounded-pill bg-secondary">0</span>
+                            {% endif %}
+
+                            {% if p[8] > 0 %}
+                                <div class="mt-1">
+                                    <span class="badge bg-danger border border-light blink">
+                                        <i class="bi bi-exclamation-triangle-fill"></i> {{ p[8] }} Caducados
+                                    </span>
+                                </div>
                             {% endif %}
                         </td>
 
-                        <td class="text-success fw-bold">${{ p[6] }}</td>
-
-                        <td>
-                            <button class="btn btn-outline-primary btn-sm" title="Ver Detalles">
+                        <td class="text-success fw-bold">${{ p[6] }}</td> <td>
+                            <button class="btn btn-outline-primary btn-sm" onclick="verDetalles('{{ p[7] }}')">
                                 <i class="bi bi-eye"></i>
                             </button>
                         </td>
                     </tr>
-                    {% endfor %}
-                </tbody>
+                    {% endfor %} 
+                    </tbody>
             </table>
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="modalDetalle" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="lblNombreProducto">Cargando...</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <p><strong>SKU:</strong> <span id="lblSKU"></span></p>
+                        <p><strong>UPC:</strong> <span id="lblUPC"></span></p>
+                        <p><strong>Categoría:</strong> <span id="lblCategoria" class="badge bg-info text-dark"></span></p>
+                        <p><strong>Laboratorio:</strong> <span id="lblLaboratorio"></span></p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Costo:</strong> <span class="text-danger" id="lblCosto"></span></p>
+                        <p><strong>Precio:</strong> <span class="text-success fw-bold fs-5" id="lblPrecio"></span></p>
+                        <p><strong>Margen:</strong> <span id="lblMargen"></span></p>
+                        <p><strong>Stock Total:</strong> <span id="lblStock" class="badge bg-dark"></span></p>
+                    </div>
+                </div>
+
+                <div class="alert alert-light border">
+                    <strong>Descripción:</strong><br>
+                    <span id="lblDescripcion" class="text-muted"></span>
+                </div>
+
+                <hr>
+                <h6>📦 Desglose de Lotes</h6>
+                <table class="table table-sm table-bordered">
+                    <thead class="table-light">
+                        <tr>
+                            <th># Lote</th>
+                            <th>Caducidad</th>
+                            <th>Cantidad</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaLotes"></tbody>
+                </table>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function verDetalles(idProducto) {
+        var myModal = new bootstrap.Modal(document.getElementById('modalDetalle'));
+        myModal.show();
+
+        fetch('/api/producto/' + idProducto) 
+            .then(response => response.json())
+            .then(data => {
+                const p = data.producto;
+                const lotes = data.lotes;
+
+                document.getElementById('lblNombreProducto').innerText = p.nombre;
+                document.getElementById('lblSKU').innerText = p.sku;
+                document.getElementById('lblUPC').innerText = p.upc || '-';
+                document.getElementById('lblCategoria').innerText = p.cat_nombre;
+                document.getElementById('lblLaboratorio').innerText = p.lab_nombre;
+                document.getElementById('lblDescripcion').innerText = p.descripcion || 'Sin detalles.';
+                
+                document.getElementById('lblCosto').innerText = '$' + parseFloat(p.precio_compra).toFixed(2);
+                document.getElementById('lblPrecio').innerText = '$' + parseFloat(p.precio_venta).toFixed(2);
+                
+                let margen = p.precio_venta - p.precio_compra;
+                document.getElementById('lblMargen').innerText = '$' + margen.toFixed(2);
+                document.getElementById('lblStock').innerText = p.stock_real;
+
+                const tabla = document.getElementById('tablaLotes');
+                tabla.innerHTML = '';
+                
+                if(lotes.length === 0) {
+                    tabla.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Sin stock físico</td></tr>';
+                } else {
+                    lotes.forEach(l => {
+                        let fechaCad = new Date(l.fecha_caducidad);
+                        let hoy = new Date();
+                        let estado = '<span class="badge bg-success">Vigente</span>';
+                        
+                        // Ajustamos a medianoche para comparar solo fechas
+                        hoy.setHours(0,0,0,0); 
+                        
+                        if (fechaCad < hoy) {
+                            estado = '<span class="badge bg-danger">CADUCADO</span>';
+                        }
+
+                        let row = `<tr>
+                            <td>${l.numero_lote}</td>
+                            <td>${l.fecha_caducidad}</td>
+                            <td class="fw-bold">${l.stock_actual}</td>
+                            <td>${estado}</td>
+                        </tr>`;
+                        tabla.innerHTML += row;
+                    });
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert("Error al cargar detalles");
+            });
+    }
+</script>
 {% endblock %}

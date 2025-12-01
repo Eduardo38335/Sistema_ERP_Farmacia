@@ -85,7 +85,36 @@
     </div>
 
 </div>
-
+<div class="modal fade" id="modalLotes" data-bs-backdrop="static" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content border-danger">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">⚠️ ALERTA: Lote Próximo Caducado</h5>
+            </div>
+            <div class="modal-body">
+                <p class="fs-5">El sistema detectó que el lote más antiguo de <strong id="lblProdProblema"></strong> ya caducó.</p>
+                <p>Por seguridad, selecciona manualmente de qué lote vas a vender:</p>
+                
+                <table class="table table-bordered">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Lote</th>
+                            <th>Caducidad</th>
+                            <th>Stock</th>
+                            <th>Estado</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaLotesConflicto">
+                        </tbody>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar Venta</button>
+            </div>
+        </div>
+    </div>
+</div>
 <script>
     // 1. VARIABLES GLOBALES
     let carrito = []; // Aquí guardaremos los productos seleccionados
@@ -186,31 +215,87 @@
         });
     });
 
-    // 7. COBRAR (Enviar a Python)
+// 7. COBRAR (INTELIGENTE CON MANEJO DE CADUCIDAD)
     function cobrar() {
-        if (carrito.length === 0) {
-            alert("El carrito está vacío");
-            return;
-        }
+        if (carrito.length === 0) { alert("Carrito vacío"); return; }
+        
+        // Enviamos datos
+        enviarVenta(carrito);
+    }
 
-        // Enviamos los datos al servidor usando FETCH (AJAX)
-        if(!confirm("¿Confirmar venta por $" + total.toFixed(2) + "?")) return;
-
+    function enviarVenta(datosCarrito) {
         fetch('/procesar_venta', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(carrito) // Convertimos el array a texto JSON
+            body: JSON.stringify(datosCarrito)
         })
         .then(response => response.json())
         .then(data => {
             if (data.exito) {
-                alert("✅ ¡Venta realizada con éxito! Ticket: " + data.folio);
-                window.location.reload(); // Recargar para actualizar stock
-            } else {
+                // ÉXITO NORMAL
+                window.open("/ticket/" + data.folio, "_blank");
+                window.location.reload(); 
+            } 
+            else if (data.error === 'CADUCIDAD_DETECTADA') {
+                // ⚠️ ALERTA: HAY QUE ELEGIR LOTE MANUALMENTE
+                mostrarModalLotes(data);
+            }
+            else {
                 alert("❌ Error: " + data.error);
             }
         })
         .catch(error => console.error('Error:', error));
+    }
+
+    // Función para mostrar el modal cuando hay lotes podridos
+    function mostrarModalLotes(data) {
+        const modal = new bootstrap.Modal(document.getElementById('modalLotes'));
+        document.getElementById('lblProdProblema').innerText = data.producto;
+        
+        const tbody = document.getElementById('tablaLotesConflicto');
+        tbody.innerHTML = '';
+        
+        data.lotes_disponibles.forEach(l => {
+            let claseFila = l.caducado ? 'table-danger' : 'table-success';
+            let estado = l.caducado ? '⛔ CADUCADO' : '✅ VIGENTE';
+            let btnClase = l.caducado ? 'btn-outline-secondary disabled' : 'btn-success';
+            
+            // Solo permitimos seleccionar lotes vigentes
+            let boton = l.caducado 
+                ? '<small>No vendible</small>' 
+                : `<button class="btn btn-sm ${btnClase}" onclick="resolverConflicto('${data.sku_problematico}', ${l.id_lote})">Usar este</button>`;
+
+            let tr = `
+                <tr class="${claseFila}">
+                    <td class="fw-bold">${l.numero}</td>
+                    <td>${l.fecha}</td>
+                    <td>${l.stock}</td>
+                    <td>${estado}</td>
+                    <td>${boton}</td>
+                </tr>
+            `;
+            tbody.innerHTML += tr;
+        });
+        
+        modal.show();
+    }
+
+    // Función que se ejecuta cuando el usuario elige un lote bueno
+    function resolverConflicto(sku, idLote) {
+        // 1. Buscamos el producto en el carrito
+        let item = carrito.find(p => p.sku === sku);
+        if (item) {
+            // 2. Le inyectamos el ID MANUAL para que el servidor sepa cuál usar
+            item.id_lote_manual = idLote;
+            
+            // 3. Cerramos modal
+            const modalEl = document.getElementById('modalLotes');
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            modal.hide();
+            
+            // 4. REINTENTAMOS LA VENTA (Ahora pasará porque lleva ID manual)
+            enviarVenta(carrito);
+        }
     }
 </script>
 
