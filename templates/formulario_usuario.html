@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    {% if usuario %} ✏️ Editar Usuario {% else %} ✨ Nuevo Usuario {% endif %}
+                </h5>
+            </div>
+            <div class="card-body">
+                <form action="/guardar_usuario" method="POST">
+                    
+                    <input type="hidden" name="id_usuario" value="{{ usuario.id_usuario if usuario else '' }}">
+
+                    <div class="mb-3">
+                        <label class="form-label">Nombre(s)</label>
+                        <input type="text" name="nombres" class="form-control" value="{{ usuario.nombres if usuario else '' }}" required>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col">
+                            <label class="form-label">Apellido Paterno</label>
+                            <input type="text" name="paterno" class="form-control" value="{{ usuario.apellido_paterno if usuario else '' }}" required>
+                        </div>
+                        <div class="col">
+                            <label class="form-label">Apellido Materno</label>
+                            <input type="text" name="materno" class="form-control" value="{{ usuario.apellido_materno if usuario else '' }}">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Usuario (Login)</label>
+                        <input type="text" name="username" class="form-control" value="{{ usuario.username if usuario else '' }}" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Contraseña</label>
+                        <input type="password" name="password" class="form-control" placeholder="{{ 'Dejar vacío para no cambiar' if usuario else 'Crear contraseña' }}">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Rol / Permisos</label>
+                        <select name="id_rol" class="form-select" required>
+                            {% for r in roles %}
+                                <option value="{{ r.id_rol }}" 
+                                    {% if usuario and usuario.id_rol == r.id_rol %}selected{% endif %}>
+                                    {{ r.nombre }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" name="estatus" value="1" 
+                            {% if not usuario or usuario.estatus == 1 %}checked{% endif %}>
+                        <label class="form-check-label">Usuario Activo</label>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-success">Guardar Cambios</button>
+                        <a href="/usuarios" class="btn btn-secondary">Cancelar</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

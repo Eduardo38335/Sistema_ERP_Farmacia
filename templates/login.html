@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso Restringido - Farmacia ERP</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            /* CAMBIO: Usamos variable de Bootstrap para el fondo */
+            background-color: var(--bs-tertiary-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            transition: background-color 0.3s;
+        }
+        .login-card {
+            width: 100%;
+            max-width: 400px;
+            padding: 2rem;
+            border-radius: 15px;
+            /* CAMBIO: Fondo adaptativo (blanco en día, gris en noche) */
+            background-color: var(--bs-body-bg);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            border: 1px solid var(--bs-border-color); /* Borde sutil para modo oscuro */
+        }
+        .login-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .login-icon {
+            font-size: 3rem;
+            color: #0d6efd;
+        }
+        
+        /* Ajuste de sombra para que se vea bien en modo oscuro */
+        [data-bs-theme="dark"] .login-card {
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="login-card">
+        <div class="login-header">
+            <div class="login-icon">🏥</div>
+            <h3>Farmacia La Luz</h3>
+            <p class="text-muted">Sistema Administrativo</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form action="/login" method="POST">
+            <div class="mb-3">
+                <label class="form-label">Usuario</label>
+                <input type="text" name="username" class="form-control form-control-lg" placeholder="Ej: admin" required autofocus>
+            </div>
+            <div class="mb-4">
+                <label class="form-label">Contraseña</label>
+                <input type="password" name="password" class="form-control form-control-lg" placeholder="••••••" required>
+            </div>
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary btn-lg">Iniciar Sesión</button>
+            </div>
+        </form>
+        
+        <div class="text-center mt-3">
+            <small class="text-muted">Solo personal autorizado</small>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        (() => {
+            'use strict'
+            // 1. Revisar si el usuario ya había elegido un tema antes (en base.html)
+            const getStoredTheme = () => localStorage.getItem('theme')
+            
+            // 2. Si no, revisar la configuración de Windows/Mac
+            const getPreferredTheme = () => {
+                const storedTheme = getStoredTheme()
+                if (storedTheme) { return storedTheme }
+                return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+            }
+
+            // 3. Aplicar el tema
+            const setTheme = theme => {
+                document.documentElement.setAttribute('data-bs-theme', theme)
+            }
+
+            setTheme(getPreferredTheme())
+        })()
+    </script>
+</body>
+</html>
