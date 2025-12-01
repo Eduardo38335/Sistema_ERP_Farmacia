@@ -3,171 +3,173 @@
 {% block content %}
 
 <style>
-    /* === CORRECCIÓN VISUAL PARA MODO OSCURO/CLARO === */
-    
-    /* Inputs adaptativos (Se arregla el problema de cajas negras) */
+    /* Estilos visuales adaptables */
     .form-control, .form-select {
-        background-color: var(--bs-body-bg); 
-        color: var(--bs-body-color);
-        border-color: var(--bs-border-color);
+        background-color: var(--bs-body-bg); color: var(--bs-body-color); border-color: var(--bs-border-color);
     }
-    
     .form-control:focus {
-        border-color: #0d6efd;
-        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+        border-color: #0d6efd; box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+    /* Lista Flotante */
+    .lista-flotante {
+        position: absolute; z-index: 1050; width: 100%; max-height: 200px; overflow-y: auto;
+        background: var(--bs-body-bg); border: 1px solid var(--bs-border-color); display: none;
+    }
+    .item-resultado { padding: 8px 12px; border-bottom: 1px solid var(--bs-border-color); cursor: pointer; color: var(--bs-body-color); }
+    
+    /* ESTILO PARA CUANDO TE MUEVES CON FLECHAS */
+    .item-resultado.active, .item-resultado:hover {
+        background-color: #0d6efd; color: white; font-weight: bold;
     }
 
-    /* Tabla compacta y legible */
+    /* Tabla */
     .tabla-captura th { background: #212529; color: white; font-size: 0.85rem; text-align: right; }
     .tabla-captura td { text-align: right; vertical-align: middle; }
     .tabla-captura td:first-child, .tabla-captura th:first-child { text-align: left; }
 
-    /* Lista Flotante (Buscador) */
-    .lista-flotante {
-        position: absolute; 
-        z-index: 1050; 
-        width: 100%; 
-        max-height: 200px;
-        overflow-y: auto; 
-        border: 1px solid var(--bs-border-color); 
-        border-radius: 0.375rem;
-        background-color: var(--bs-body-bg); 
-        display: none;
-    }
-    
-    .item-resultado { 
-        padding: 8px 12px; 
-        border-bottom: 1px solid var(--bs-border-color); 
-        cursor: pointer; 
-        color: var(--bs-body-color);
-    }
-    
-    .item-resultado:hover, .item-resultado.active { 
-        background-color: var(--bs-primary); 
-        color: white; 
-    }
-
-    /* Quitar flechas de inputs numéricos */
+    /* Inputs limpios */
     input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 </style>
 
-<div class="card shadow-lg border-0">
-    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="bi bi-receipt"></i> Nueva Factura de Compra</h5>
+<div class="row justify-content-center">
+    <div class="col-md-12"> <div class="card shadow-lg border-0">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-cart-plus"></i> Registrar Entrada</h5>
+            </div>
+            <div class="card-body">
+                
+                <div class="row mb-4 p-3 border rounded shadow-sm bg-body-tertiary">
+                    <div class="col-md-4 position-relative">
+                        <label class="fw-bold small">Proveedor</label>
+                        <div class="input-group">
+                            <input type="text" id="busc_prov" class="form-control" placeholder="Buscar..." autocomplete="off">
+                            <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#modalNuevoProv" title="Crear Proveedor">+</button>
+                        </div>
+                        <input type="hidden" id="id_prov">
+                        <div id="lista_prov" class="lista-flotante"></div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="fw-bold small">Folio Factura</label>
+                        <input type="text" id="folio" class="form-control" placeholder="Ej: F-12345">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="fw-bold small">Fecha</label>
+                        <input type="date" id="fecha" class="form-control">
+                    </div>
+                </div>
+
+                <div class="card mb-3 border border-primary">
+                    <div class="card-body p-2">
+                        <div class="row g-2 align-items-end">
+                            
+                            <div class="col-md-3 position-relative">
+                                <label class="small text-primary fw-bold">Producto</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="text" id="busc_prod" class="form-control" placeholder="Escanear..." autocomplete="off">
+                                    <button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#modalNuevoProd">+</button>
+                                </div>
+                                <input type="hidden" id="id_prod">
+                                <div id="lista_prod" class="lista-flotante"></div>
+                            </div>
+
+                            <div class="col-md-2">
+                                <label class="small text-muted">Lote</label>
+                                <input type="text" id="lote" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="small text-muted">Caducidad</label>
+                                <input type="date" id="caducidad" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-md-1">
+                                <label class="small text-muted">Cant.</label>
+                                <input type="number" id="cant" class="form-control form-control-sm text-center" value="1" onfocus="this.select()">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="small text-muted">Costo ($)</label>
+                                <input type="number" id="costo" class="form-control form-control-sm text-end" onfocus="this.select()">
+                            </div>
+                            <div class="col-md-1">
+                                <label class="small text-muted">% IVA</label>
+                                <input type="number" id="tasa_iva" class="form-control form-control-sm text-center" value="0" onfocus="this.select()">
+                            </div>
+                            
+                            <div class="col-md-1">
+                                <button class="btn btn-primary btn-sm w-100 fw-bold" onclick="agregarLinea()" title="Agregar Línea">
+                                    <i class="bi bi-arrow-down-square-fill fs-6"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive border rounded mb-3" style="min-height: 200px; max-height: 400px; overflow-y: auto;">
+                    <table class="table table-hover table-sm tabla-captura mb-0">
+                        <thead class="sticky-top"><tr><th>Producto</th><th>Lote</th><th>Caducidad</th><th>Cant.</th><th>Costo</th><th>Subtotal</th><th>IVA</th><th>Total</th><th></th></tr></thead>
+                        <tbody id="tabla-body"></tbody>
+                    </table>
+                </div>
+
+                <div class="row justify-content-end mb-3">
+                    <div class="col-md-4">
+                        <table class="table table-sm table-borderless text-end mb-0">
+                            <tr><td>Subtotal:</td><td class="fw-bold" id="lbl-subtotal">$0.00</td></tr>
+                            <tr><td>Impuestos:</td><td class="fw-bold text-danger" id="lbl-impuestos">$0.00</td></tr>
+                            <tr class="border-top"><td>Total:</td><td class="fs-5 fw-bold text-success" id="lbl-total">$0.00</td></tr>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 border-top pt-3">
+                    <a href="/compras" class="btn btn-secondary">Cancelar</a>
+                    <button class="btn btn-success px-5 fw-bold shadow" onclick="guardarFactura()">
+                        <i class="bi bi-save"></i> GUARDAR FACTURA
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
-    <div class="card-body">
-        
-        <div class="row mb-3 p-3 border rounded shadow-sm" style="background-color: var(--bs-tertiary-bg);">
-            <div class="col-md-4 position-relative">
-                <label class="fw-bold small">Proveedor</label>
-                <input type="text" id="busc_prov" class="form-control" placeholder="Buscar proveedor..." autocomplete="off">
-                <input type="hidden" id="id_prov">
-                <div id="lista_prov" class="lista-flotante"></div>
-            </div>
-            <div class="col-md-4">
-                <label class="fw-bold small">Folio Factura</label>
-                <input type="text" id="folio" class="form-control" placeholder="Ej: F-12345">
-            </div>
-            <div class="col-md-4">
-                <label class="fw-bold small">Fecha</label>
-                <input type="date" id="fecha" class="form-control">
+</div>
+
+<div class="modal fade" id="modalNuevoProv" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white py-2"><h6 class="modal-title">Nuevo Proveedor</h6><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <label class="small fw-bold">Nombre Comercial</label>
+                <input type="text" id="new_prov_nombre" class="form-control mb-3" required>
+                <button class="btn btn-primary w-100 btn-sm" onclick="guardarProveedorRapido()">Guardar</button>
             </div>
         </div>
+    </div>
+</div>
 
-        <div class="row g-2 align-items-end mb-2">
-            <div class="col-md-3 position-relative">
-                <label class="small text-muted">Producto</label>
-                <input type="text" id="busc_prod" class="form-control" placeholder="Escanear/Escribir..." autocomplete="off">
-                <input type="hidden" id="id_prod">
-                <div id="lista_prod" class="lista-flotante"></div>
+<div class="modal fade" id="modalNuevoProd" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white py-2"><h6 class="modal-title">Nuevo Producto</h6><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <form id="formRapido">
+                    <div class="row mb-2"><div class="col"><label class="small fw-bold">SKU *</label><input type="text" id="new_sku" class="form-control form-control-sm"></div><div class="col"><label class="small">UPC</label><input type="text" id="new_upc" class="form-control form-control-sm"></div></div>
+                    <div class="mb-2"><label class="small fw-bold">Nombre *</label><input type="text" id="new_nombre" class="form-control form-control-sm"></div>
+                    <div class="mb-3"><label class="small fw-bold text-success">Precio Venta *</label><input type="number" id="new_precio" class="form-control form-control-sm"></div>
+                </form>
             </div>
-            <div class="col-md-2">
-                <label class="small text-muted">Lote</label>
-                <input type="text" id="lote" class="form-control">
-            </div>
-            <div class="col-md-2">
-                <label class="small text-muted">Caducidad</label>
-                <input type="date" id="caducidad" class="form-control">
-            </div>
-            <div class="col-md-1">
-                <label class="small text-muted">Cant.</label>
-                <input type="number" id="cant" class="form-control text-center" value="1" onfocus="this.select()">
-            </div>
-            <div class="col-md-2">
-                <label class="small text-muted">Costo Base ($)</label>
-                <input type="number" id="costo" class="form-control text-end" onfocus="this.select()">
-            </div>
-            <div class="col-md-1">
-                <label class="small text-muted">% IVA</label>
-                <input type="number" id="tasa_iva" class="form-control text-center" value="0" onfocus="this.select()">
-            </div>
-            <div class="col-md-1">
-                <button class="btn btn-success w-100" onclick="agregarLinea()">
-                    <i class="bi bi-plus-lg"></i>
-                </button>
-            </div>
+            <div class="modal-footer py-1"><button class="btn btn-success btn-sm" onclick="guardarProductoRapido()">Guardar</button></div>
         </div>
-
-        <div class="table-responsive border rounded mb-3" style="min-height: 200px;">
-            <table class="table table-hover table-sm tabla-captura mb-0">
-                <thead>
-                    <tr>
-                        <th>Producto</th>
-                        <th>Lote</th>
-                        <th>Cant.</th>
-                        <th class="text-end">Costo U.</th>
-                        <th class="text-end">Subtotal</th>
-                        <th class="text-end">IVA</th>
-                        <th class="text-end">Total</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody id="tabla-body"></tbody>
-            </table>
-        </div>
-
-        <div class="row justify-content-end mb-3">
-            <div class="col-md-4">
-                <table class="table table-sm table-borderless text-end mb-0" style="background: transparent;">
-                    <tr>
-                        <td>Subtotal:</td>
-                        <td class="fw-bold" id="lbl-subtotal">$0.00</td>
-                    </tr>
-                    <tr>
-                        <td>Impuestos:</td>
-                        <td class="fw-bold text-danger" id="lbl-impuestos">$0.00</td>
-                    </tr>
-                    <tr class="border-top border-secondary">
-                        <td class="fs-5">Total Factura:</td>
-                        <td class="fs-5 fw-bold text-success" id="lbl-total">$0.00</td>
-                    </tr>
-                </table>
-            </div>
-        </div>
-
-        <div class="d-flex justify-content-end gap-2 border-top pt-3">
-            <a href="/compras" class="btn btn-secondary">Cancelar</a>
-            <button class="btn btn-primary px-4 fw-bold" onclick="guardarFactura()">
-                <i class="bi bi-save"></i> GUARDAR FACTURA
-            </button>
-        </div>
-
     </div>
 </div>
 
 <script>
-    // DATOS DE PYTHON A JS
-    const listaProveedores = [{% for p in proveedores %} { id: "{{p[0]}}", texto: "{{p[1]}}" }, {% endfor %}];
-    const listaProductos = [{% for p in productos %} { id: "{{p[0]}}", texto: "{{p[1]}}" }, {% endfor %}];
-
+    let listaProveedores = [{% for p in proveedores %} { id: "{{p[0]}}", texto: "{{p[1]}}" }, {% endfor %}];
+    let listaProductos = [{% for p in productos %} { id: "{{p[0]}}", texto: "{{p[1]}}" }, {% endfor %}];
     let carritoCompra = [];
-    
-    // INICIALIZAR BUSCADORES
-    initLiveSearch('busc_prov', 'id_prov', 'lista_prov', listaProveedores);
-    initLiveSearch('busc_prod', 'id_prod', 'lista_prod', listaProductos, true);
 
-    function initLiveSearch(inputId, hiddenId, listId, data, isProduct=false) {
+    // INICIALIZAMOS LOS BUSCADORES CON TECLADO
+    setupBuscador('busc_prov', 'id_prov', 'lista_prov', listaProveedores);
+    setupBuscador('busc_prod', 'id_prod', 'lista_prod', listaProductos, true);
+
+    function setupBuscador(inputId, hiddenId, listId, datos, esProducto=false) {
         const input = document.getElementById(inputId);
         const hidden = document.getElementById(hiddenId);
         const list = document.getElementById(listId);
@@ -177,48 +179,47 @@
             const term = this.value.toLowerCase();
             list.innerHTML = '';
             currentFocus = -1;
-            hidden.value = ''; // Limpiar ID si el usuario borra texto
-            
-            if (term.length < 1) { list.style.display = 'none'; return; }
+            hidden.value = ''; // Limpiar ID al escribir
+            input.classList.remove('border-danger', 'text-danger'); // Quitar error si edita
 
-            const matches = data.filter(item => item.texto.toLowerCase().includes(term));
+            if(term.length < 1) { list.style.display = 'none'; return; }
             
-            if (matches.length > 0) {
+            // Usar la lista actualizada (por si se crearon nuevos)
+            const fuente = esProducto ? listaProductos : listaProveedores;
+            const matches = fuente.filter(d => d.texto.toLowerCase().includes(term));
+
+            if(matches.length > 0) {
                 list.style.display = 'block';
                 matches.forEach(item => {
                     const div = document.createElement('div');
-                    div.className = 'item-resultado';
-                    div.innerText = item.texto;
-                    div.onclick = () => selectItem(item, input, hidden, list, isProduct);
+                    div.className = 'item-resultado'; div.innerText = item.texto;
+                    div.onclick = () => selectItem(item);
                     list.appendChild(div);
                 });
             } else {
+                // FEEDBACK VISUAL: ROJO SI NO EXISTE
+                input.classList.add('border-danger', 'text-danger');
                 list.style.display = 'none';
             }
         });
 
-        // NAVEGACIÓN TECLADO
+        // --- NAVEGACIÓN CON TECLADO ---
         input.addEventListener('keydown', function(e) {
-            let items = list.getElementsByTagName('div');
+            let x = list.getElementsByTagName('div');
             if (e.key === 'ArrowDown') {
                 currentFocus++;
-                addActive(items);
+                addActive(x);
             } else if (e.key === 'ArrowUp') {
                 currentFocus--;
-                addActive(items);
+                addActive(x);
             } else if (e.key === 'Enter') {
-                e.preventDefault();
+                e.preventDefault(); // Evitar submit del form
                 if (currentFocus > -1) {
-                    if (items) items[currentFocus].click();
-                } else if (items.length === 1) {
-                    items[0].click(); // Auto-select si solo hay 1
+                    if (x) x[currentFocus].click(); // Simular clic en la opción resaltada
+                } else if (x.length === 1) {
+                    x[0].click(); // Si solo hay 1, seleccionar ese
                 }
             }
-        });
-
-        // CERRAR AL CLIC FUERA
-        document.addEventListener('click', function (e) {
-            if (e.target !== input) list.style.display = 'none';
         });
 
         function addActive(x) {
@@ -226,147 +227,143 @@
             removeActive(x);
             if (currentFocus >= x.length) currentFocus = 0;
             if (currentFocus < 0) currentFocus = (x.length - 1);
-            x[currentFocus].classList.add('active');
-            x[currentFocus].scrollIntoView({ block: 'nearest' });
+            x[currentFocus].classList.add("active");
+            x[currentFocus].scrollIntoView({block: "nearest"}); // Scroll automático
         }
         function removeActive(x) {
-            for (let i = 0; i < x.length; i++) { x[i].classList.remove('active'); }
+            for (let i = 0; i < x.length; i++) x[i].classList.remove("active");
         }
+        function selectItem(item) {
+            input.value = item.texto;
+            hidden.value = item.id;
+            input.classList.remove('border-danger', 'text-danger'); // Quitar rojo
+            input.classList.add('border-success'); // Poner verde confirmación
+            list.style.display = 'none';
+            if(esProducto) document.getElementById('lote').focus();
+            else document.getElementById('folio').focus();
+        }
+        
+        document.addEventListener('click', e => { if(e.target !== input) list.style.display = 'none'; });
     }
 
-    function selectItem(item, input, hidden, list, isProduct) {
-        input.value = item.texto;
-        hidden.value = item.id;
-        list.style.display = 'none';
-        if (isProduct) document.getElementById('lote').focus();
-        else document.getElementById('folio').focus();
+    // --- GUARDAR PROVEEDOR RÁPIDO ---
+    function guardarProveedorRapido() {
+        const nombre = document.getElementById('new_prov_nombre').value;
+        if(!nombre) return alert("Escribe el nombre");
+        
+        fetch('/api/crear_proveedor_rapido', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ nombre })
+        }).then(r=>r.json()).then(d => {
+            if(d.exito) {
+                listaProveedores.push(d.proveedor); // Agregar a memoria
+                const inp = document.getElementById('busc_prov');
+                inp.value = d.proveedor.texto;
+                document.getElementById('id_prov').value = d.proveedor.id;
+                inp.classList.remove('border-danger'); inp.classList.add('border-success');
+                
+                bootstrap.Modal.getInstance(document.getElementById('modalNuevoProv')).hide();
+                document.getElementById('new_prov_nombre').value = '';
+                document.getElementById('folio').focus();
+            } else { alert(d.error); }
+        });
     }
 
-    // --- AGREGAR LINEA (CORREGIDO IVA PORCENTUAL) ---
+    // --- (LAS DEMÁS FUNCIONES SIGUEN IGUAL: guardarProductoRapido, agregarLinea, etc.) ---
+    // Asegúrate de copiar las funciones de agregarLinea y guardarProductoRapido del código anterior
+    // si no las tienes, avísame y te paso el bloque completo.
+    
+    function guardarProductoRapido() {
+        const sku = document.getElementById('new_sku').value;
+        const nombre = document.getElementById('new_nombre').value;
+        const precio = document.getElementById('new_precio').value;
+        const upc = document.getElementById('new_upc').value;
+        if(!sku || !nombre || !precio) { alert("Llena campos obligatorios (*)"); return; }
+
+        fetch('/api/crear_producto_rapido', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ sku, nombre, precio_venta: precio, upc })
+        }).then(res => res.json()).then(data => {
+            if(data.exito) {
+                const nuevoItem = { id: data.producto.id, texto: data.producto.texto };
+                listaProductos.push(nuevoItem);
+                
+                const inp = document.getElementById('busc_prod');
+                inp.value = nuevoItem.texto;
+                document.getElementById('id_prod').value = nuevoItem.id;
+                inp.classList.remove('border-danger'); inp.classList.add('border-success');
+
+                bootstrap.Modal.getInstance(document.getElementById('modalNuevoProd')).hide();
+                document.getElementById('formRapido').reset();
+                document.getElementById('lote').focus();
+            } else { alert("Error: " + data.error); }
+        });
+    }
+
     function agregarLinea() {
+        // ... (Tu función agregarLinea con cálculo de IVA corregido va aquí)
+        // COPIA TU FUNCIÓN ANTERIOR O PÍDEMELA SI LA NECESITAS
         const idProd = document.getElementById('id_prod').value;
         const nombreProd = document.getElementById('busc_prod').value;
         const lote = document.getElementById('lote').value;
         const caducidad = document.getElementById('caducidad').value;
-        
         const cant = parseFloat(document.getElementById('cant').value) || 0;
         const costoBase = parseFloat(document.getElementById('costo').value) || 0;
         const tasaIVA = parseFloat(document.getElementById('tasa_iva').value) || 0;
 
-        if(!idProd) { alert("⚠️ Seleccione un producto válido de la lista."); return; }
-        if(!lote) { alert("⚠️ Escriba el Lote."); return; }
-        if(!caducidad) { alert("⚠️ Seleccione la fecha de caducidad."); return; }
-        if(cant <= 0) { alert("⚠️ La cantidad debe ser mayor a 0."); return; }
-        if(costoBase <= 0) { alert("⚠️ El costo debe ser mayor a 0."); return; }
+        if(!idProd) { 
+            document.getElementById('busc_prod').focus();
+            document.getElementById('busc_prod').classList.add('border-danger');
+            return alert("Selecciona un producto válido."); 
+        }
+        if(!lote || !caducidad || cant <= 0 || costoBase <= 0) { return alert("Faltan datos."); }
 
-        // CÁLCULOS MATEMÁTICOS CORREGIDOS
         const subtotal = cant * costoBase;
-        const montoIVA = subtotal * (tasaIVA / 100); // 16% de 100 = 16
+        const montoIVA = subtotal * (tasaIVA / 100);
         const totalLinea = subtotal + montoIVA;
 
-        carritoCompra.push({
-            id_producto: idProd,
-            nombre: nombreProd,
-            lote, caducidad, cantidad: cant,
-            costo: costoBase,
-            subtotal, monto_iva: montoIVA, total: totalLinea
-        });
-
+        carritoCompra.push({ id_producto: idProd, nombre: nombreProd, lote, caducidad, cantidad: cant, costo: costoBase, subtotal, monto_iva: montoIVA, total: totalLinea });
         renderizarTabla();
         
-        // Limpiar campos para siguiente producto
         document.getElementById('busc_prod').value = '';
         document.getElementById('id_prod').value = '';
         document.getElementById('lote').value = '';
         document.getElementById('cant').value = '1';
         document.getElementById('costo').value = '';
+        document.getElementById('busc_prod').classList.remove('border-success');
         document.getElementById('busc_prod').focus();
     }
 
     function renderizarTabla() {
         const tbody = document.getElementById('tabla-body');
         tbody.innerHTML = '';
-        
-        let sumSubtotal = 0;
-        let sumImpuestos = 0;
-        let sumTotal = 0;
-
+        let sSub=0, sIva=0, sTot=0;
         carritoCompra.forEach((item, index) => {
-            sumSubtotal += item.subtotal;
-            sumImpuestos += item.monto_iva;
-            sumTotal += item.total;
-
+            sSub += item.subtotal; sIva += item.monto_iva; sTot += item.total;
             const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${item.nombre}</td>
-                <td><small>${item.lote}</small></td>
-                <td class="text-center">${item.cantidad}</td>
-                <td class="text-end">$${item.costo.toFixed(2)}</td>
-                <td class="text-end">$${item.subtotal.toFixed(2)}</td>
-                <td class="text-end text-danger">$${item.monto_iva.toFixed(2)}</td>
-                <td class="text-end fw-bold text-success">$${item.total.toFixed(2)}</td>
-                <td class="text-center"><button class="btn btn-sm btn-link text-danger p-0" onclick="eliminarLinea(${index})"><i class="bi bi-x-circle"></i></button></td>
-            `;
+            tr.innerHTML = `<td>${item.nombre}</td><td><small>${item.lote}</small></td><td class="text-center">${item.cantidad}</td><td class="text-end">$${item.costo.toFixed(2)}</td><td class="text-end">$${item.subtotal.toFixed(2)}</td><td class="text-end text-danger">$${item.monto_iva.toFixed(2)}</td><td class="text-end fw-bold text-success">$${item.total.toFixed(2)}</td><td class="text-center"><button class="btn btn-sm text-danger" onclick="eliminarLinea(${index})">X</button></td>`;
             tbody.appendChild(tr);
         });
-
-        document.getElementById('lbl-subtotal').innerText = '$' + sumSubtotal.toFixed(2);
-        document.getElementById('lbl-impuestos').innerText = '$' + sumImpuestos.toFixed(2);
-        document.getElementById('lbl-total').innerText = '$' + sumTotal.toFixed(2);
+        document.getElementById('lbl-subtotal').innerText = '$' + sSub.toFixed(2);
+        document.getElementById('lbl-impuestos').innerText = '$' + sIva.toFixed(2);
+        document.getElementById('lbl-total').innerText = '$' + sTot.toFixed(2);
     }
 
-    function eliminarLinea(index) {
-        carritoCompra.splice(index, 1);
-        renderizarTabla();
-    }
+    function eliminarLinea(i) { carritoCompra.splice(i, 1); renderizarTabla(); }
 
-    // --- GUARDAR FACTURA ---
     function guardarFactura() {
-        const inputProv = document.getElementById('busc_prov');
-        const hiddenProv = document.getElementById('id_prov');
-        
-        // Auto-selección si el texto coincide
-        if (!hiddenProv.value && inputProv.value) {
-            const match = listaProveedores.find(p => p.texto.toLowerCase() === inputProv.value.toLowerCase());
-            if (match) hiddenProv.value = match.id;
-        }
-
-        const idProv = hiddenProv.value;
+        const idProv = document.getElementById('id_prov').value;
         const folio = document.getElementById('folio').value;
         const fecha = document.getElementById('fecha').value;
-
-        if(!idProv) { 
-            alert("⚠️ Error: Debes seleccionar un PROVEEDOR válido de la lista."); 
-            inputProv.focus();
-            inputProv.style.borderColor = "red";
-            return; 
-        }
-        if(!folio) { alert("⚠️ Falta el Folio de la Factura."); return; }
-        if(!fecha) { alert("⚠️ Falta la Fecha de Compra."); return; }
-        if(carritoCompra.length === 0) { alert("⚠️ La factura está vacía. Agrega productos."); return; }
-
-        const datos = {
-            id_proveedor: idProv,
-            folio_factura: folio,
-            fecha_compra: fecha,
-            productos: carritoCompra
-        };
+        if(!idProv || !folio || !fecha || carritoCompra.length === 0) { return alert("Faltan datos de cabecera o productos."); }
 
         fetch('/guardar_compra', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(datos)
-        })
-        .then(res => res.json())
-        .then(data => {
-            if(data.exito) {
-                alert("✅ Factura guardada correctamente");
-                window.location.href = "/compras";
-            } else {
-                alert("❌ Error: " + data.error);
-            }
-        })
-        .catch(err => alert("Error de conexión: " + err));
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id_proveedor: idProv, folio_factura: folio, fecha_compra: fecha, productos: carritoCompra })
+        }).then(res => res.json()).then(data => {
+            if(data.exito) { alert("✅ Factura guardada"); window.location.href = "/compras"; }
+            else { alert("Error: " + data.error); }
+        });
     }
 </script>
 
